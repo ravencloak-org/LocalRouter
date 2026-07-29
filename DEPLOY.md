@@ -35,13 +35,29 @@ Flake exposes the **headless core** + dashboard:
 
 ## Build order (tasks)
 
-1. [ ] `bun build --compile` the core; have it serve the static dashboard at `/`.
-2. [ ] Dashboard control UI (Login / model / effort / stop / status) — universal, all OSes.
-3. [ ] GitHub Actions release workflow (core matrix + dashboard + .app).
-4. [x] Swift `LocalRouter.app` (macOS menu bar). — build-verified; `tray/`, `build-app.sh`.
-5. [ ] Homebrew tap (cask + formula).
-6. [ ] Nix flake (core + dashboard, optional NixOS module).
+1. [x] `bun build --compile` core (`scripts/build.sh`) + serves dashboard at `/` (SPA fallback). Core-compile verified.
+2. [x] Dashboard control UI (Login / model / effort / stop / status) — `web/src/control.ts` + `App.ripple`. Ripple alpha: syntax not vite-verified.
+3. [x] GitHub Actions release workflow — `.github/workflows/release.yml` (bun cross-compile matrix on ubuntu + macOS .app job).
+4. [x] Swift `LocalRouter.app` (macOS menu bar) — `tray/`, `build-app.sh`.
+5. [x] Homebrew tap (cask + formula) — `packaging/homebrew/`.
+6. [x] Nix flake (core binary + NixOS module) — `flake.nix`.
 7. [ ] Go systray (win/linux) — optional, later.
+
+## Asset naming (canonical — CI, brew, nix all agree)
+
+- Core binaries: `localrouter-<os>-<arch>` with `os ∈ {darwin, linux, windows}` (windows `.exe`).
+- macOS app: `LocalRouter-macos.zip` (contains `LocalRouter.app`).
+- `VERSION` + `sha256`/SRI hashes in the brew formula/cask and flake are placeholders that
+  release automation fills per tag.
+
+## Known gotchas (from integration)
+
+- **Static root is cwd-relative.** The compiled core serves `./web/dist` — run it from a dir
+  that contains `web/dist`, or it shows the "not built" fallback. Packaging must co-locate them
+  (or embed the dashboard later).
+- **Dashboard is Ripple alpha, not vite-verified.** `bun run build` in `web/` may need syntax
+  fixes (`@for` vs `for`, `track<T>()` generic). Flagged `// ponytail:` in `App.ripple`.
+- Core `--version` prints `localrouter <VERSION>` and exits (brew/nix test hook).
 
 ## Notes
 
