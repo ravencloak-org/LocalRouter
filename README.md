@@ -2,8 +2,11 @@
 
 An OpenAI-compatible HTTP API that routes chat calls to the real `claude` CLI, so any
 OpenAI-compatible tool (Continue.dev, litellm, LangChain, or your own client) can use a
-Claude Max/Pro subscription. Ships with a live Ripple.js dashboard for logs, requests, and
-OTel spans.
+Claude Max/Pro subscription. Ships with a live Ripple.js dashboard (logs, requests, OTel
+spans) and a macOS menu-bar app (login, model/effort, stop).
+
+**Context isolation** strips Claude Code's agent context per call: ~161K → ~183 tokens,
+$0.92 → $0.0006 per request, OAuth intact. See ADR-0002 + PLAN.md.
 
 > **Why the CLI, not the API:** Anthropic bans extracting subscription OAuth tokens for
 > third-party clients, but calling the genuine `claude` CLI is allowed. LocalRouter spawns
@@ -15,11 +18,18 @@ OTel spans.
 ## Layout
 
 ```
-core/    Bun + Hono. OpenAI endpoints -> claude CLI subprocess. Event bus. (ADR-0001)
-web/     Ripple.js + Vite dashboard. Subscribes to /events over SSE.
-shared/  The Event type — the only Core<->Dashboard contract.
-docs/adr/  Decisions.  CONTEXT.md  Glossary.  PLAN.md  Design notes.
+core/       Bun + Hono. OpenAI endpoints + /control -> claude CLI subprocess. Event bus. (ADR-0001)
+web/        Ripple.js + Vite dashboard. Control bar + live /events feed over SSE.
+tray/       Swift macOS menu-bar app (NSStatusItem). Drives /control. (ADR-0003)
+shared/     The Event type — the only Core<->Dashboard contract.
+packaging/  Homebrew cask + formula.   flake.nix  Nix (headless core).
+scripts/    build.sh (compile), release-fill.sh (stamp checksums).
+docs/adr/   Decisions.  CONTEXT.md  Glossary.  PLAN.md  Design.  DEPLOY.md  Distribution.
 ```
+
+Control surfaces (ADR-0003): the **dashboard** is universal (all OSes); the **macOS tray**
+is a native convenience. Linux/BSD/Windows use the dashboard; a Go tray for win/linux is a
+later add.
 
 ## Run
 
