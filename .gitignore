@@ -4,3 +4,6 @@ dist/
 *.log
 bun.lockb
 .DS_Store
+
+.claude/
+memory/
