@@ -1,8 +1,9 @@
 # LocalRouter
 
-An OpenAI-compatible HTTP API that routes chat calls to the real `claude` CLI, so
-OpenAI-format tools (Cognee, Continue.dev, any litellm client) can use a Claude Max/Pro
-subscription. Ships with a live Ripple.js dashboard for logs, requests, and OTel spans.
+An OpenAI-compatible HTTP API that routes chat calls to the real `claude` CLI, so any
+OpenAI-compatible tool (Continue.dev, litellm, LangChain, or your own client) can use a
+Claude Max/Pro subscription. Ships with a live Ripple.js dashboard for logs, requests, and
+OTel spans.
 
 > **Why the CLI, not the API:** Anthropic bans extracting subscription OAuth tokens for
 > third-party clients, but calling the genuine `claude` CLI is allowed. LocalRouter spawns
@@ -37,17 +38,21 @@ curl localhost:8083/v1/chat/completions -H 'content-type: application/json' \
 curl localhost:8083/healthz
 ```
 
-## Point Cognee at it
+## Use it from any OpenAI client
 
-```bash
-LLM_PROVIDER=custom
-LLM_MODEL=openai/claude
-LLM_ENDPOINT=http://localhost:8083/v1
-LLM_API_KEY=dummy                 # ignored; the CLI holds the real auth
-EMBEDDING_ENDPOINT=http://localhost:8080/v1   # TEI — NOT LocalRouter (no embeddings here)
+Point any OpenAI-compatible client at `http://localhost:8083/v1` with any API key value
+(it is ignored — the CLI holds the real auth):
+
+```python
+from openai import OpenAI
+client = OpenAI(base_url="http://localhost:8083/v1", api_key="dummy")
+client.chat.completions.create(model="claude", messages=[{"role": "user", "content": "hi"}])
 ```
 
-`/v1/embeddings` returns 400 by design — the CLI has no embeddings. Route them to TEI/OpenAI/Voyage.
+**No embeddings.** `/v1/embeddings` returns 400 by design — the `claude` CLI has no
+embedding model. Route embedding calls to a separate provider (a local embedder, OpenAI, or
+Voyage). See [examples/cognee.md](examples/cognee.md) for a worked RAG setup that splits
+LLM (LocalRouter) from embeddings.
 
 ## Config (env)
 

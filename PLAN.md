@@ -2,9 +2,9 @@
 
 ## Goal
 Local HTTP proxy exposing an **OpenAI-compatible API** that routes chat calls to the
-real `claude` CLI (Claude Code) as a subprocess. Lets OpenAI-format tools (Cognee,
-Continue.dev, any litellm client) use a Claude Max/Pro subscription without an
-Anthropic API key.
+real `claude` CLI (Claude Code) as a subprocess. Lets any OpenAI-compatible tool
+(Continue.dev, litellm, LangChain, custom clients) use a Claude Max/Pro subscription
+without an Anthropic API key. Client-agnostic; see `examples/` for worked integrations.
 
 ## Why the CLI, not the API
 - Anthropic (Jan 2026) bans extracting subscription OAuth tokens for third-party API clients.
@@ -34,15 +34,10 @@ Anthropic API key.
 - CLI flag/JSON-key drift across `claude` versions (`input_tokens` location, flag names).
 - Concurrency: each request spawns a `claude` subprocess (~cold start + quota).
 
-## Target consumer
-Cognee, self-hosted. Config:
-```
-LLM_PROVIDER=custom
-LLM_MODEL=openai/claude
-LLM_ENDPOINT=http://localhost:8083/v1
-LLM_API_KEY=dummy
-EMBEDDING_ENDPOINT=http://localhost:8080/v1   # TEI — NOT LocalRouter
-```
+## Example consumers
+Any OpenAI-compatible client: base_url `http://localhost:8083/v1`, any api_key (ignored).
+RAG/memory frameworks that also need embeddings must route `EMBEDDING_*` to a separate
+provider (LocalRouter serves chat only). Worked example: `examples/cognee.md`.
 
 ## Decided
 - Stateless: every Request flattens full `messages` → fresh CLI spawn, no session mapping.
@@ -91,7 +86,7 @@ EMBEDDING_ENDPOINT=http://localhost:8080/v1   # TEI — NOT LocalRouter
 - stream-json schema confirmed; parser handles it + result.is_error. Cost/cache captured to spans.
 - **Context-bloat cost is the real problem.** Every spawn drags the whole global CLAUDE.md +
   all SessionStart hooks into context: ~144K cache_creation tokens. Cold call = $0.92 for "pong".
-  1h cache amortizes repeats to ~$0.15. For Cognee (many calls) this is a quota/cost hazard.
+  1h cache amortizes repeats to ~$0.15. For clients doing many calls this is a quota/cost hazard.
   - Fix to test: spawn `claude` with an isolated config (`CLAUDE_CONFIG_DIR=<tmp>`, clean cwd,
     no project CLAUDE.md) so hooks/global memory don't load → small context per call.
   - Also what the token-saver backlog (headroom/pxpipe) targets.
@@ -102,7 +97,7 @@ EMBEDDING_ENDPOINT=http://localhost:8080/v1   # TEI — NOT LocalRouter
   `--system-prompt <caller|default>  --strict-mcp-config --mcp-config <empty>
    --setting-sources project  --tools ""`  + neutral (empty) cwd.
 - Result: **161K → 183 tokens/call, $0.92 → $0.0006** (verified through the proxy). Default on
-  (`LR_ISOLATED=0` to opt out). This makes Cognee bulk indexing actually affordable.
+  (`LR_ISOLATED=0` to opt out). This makes bulk-indexing clients actually affordable.
 - Note: `--tools ""` also means the CLI has no tools — fine for a text-completion proxy; if
   tool-calling passthrough is ever added, isolation needs a per-request tool allowlist.
 
@@ -112,5 +107,5 @@ EMBEDDING_ENDPOINT=http://localhost:8080/v1   # TEI — NOT LocalRouter
 - [ ] Real OTel SDK + optional OTLP export (spans synthesized now).
 
 ## Open questions
-- Tool-calling: does Cognee need structured function outputs, or does text suffice?
+- Tool-calling: do typical clients need structured function outputs, or does text suffice?
 - Per-Request timeout default (seconds). [scaffold default: 300s]

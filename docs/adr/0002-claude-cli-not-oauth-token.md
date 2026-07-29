@@ -31,7 +31,7 @@ signed-in subscription, exactly as an interactive terminal session would.
 
 - Stays on Anthropic's allowed side; to their servers it looks like ordinary Claude Code use.
 - Inherits Claude Code's usage limits and rate caps - **not flat-rate**. Heavy background
-  load (e.g. Cognee indexing) burns the subscription quota fast.
+  load (e.g. a bulk-indexing client) burns the subscription quota fast.
 - Still ToS-*adjacent*: sanctioned mechanism, unsanctioned intent (feeding a non-Anthropic
   tool). A real Anthropic API key remains the boring-safe path for production/automation.
 - **No embeddings.** The CLI has no embedding endpoint and Anthropic ships no first-party

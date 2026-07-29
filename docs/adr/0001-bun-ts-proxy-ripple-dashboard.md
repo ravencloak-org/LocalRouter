@@ -9,7 +9,7 @@ Accepted
 ## Context
 
 LocalRouter exposes an OpenAI-compatible HTTP API and routes chat calls to the real
-`claude` CLI as a subprocess, so OpenAI-format tools (Cognee) can use a Claude Max/Pro
+`claude` CLI as a subprocess, so any OpenAI-compatible tool can use a Claude Max/Pro
 subscription. The subprocess path is deliberate: Anthropic (Jan 2026) bans extracting
 subscription OAuth tokens for third-party API clients, but calling the genuine `claude`
 CLI is allowed. See [0002](0002-claude-cli-not-oauth-token.md).
@@ -43,7 +43,7 @@ constraint is the mandated Ripple.js frontend, which is TypeScript + Vite.
 - Bun's OTel support has known gaps vs Node. Mitigation: the backend stays plain TS, so
   swapping the runtime to Node (keeping types and code) is trivial if OTel misbehaves.
 - No distributable single binary (Go's edge) - acceptable; LocalRouter runs locally beside
-  Cognee, not shipped.
+  the client, not shipped.
 - Dropping the TUI means terminal-only users have no LocalRouter UI. Acceptable: the tool
   is a local daemon, the dashboard is the interface.
 
