@@ -9,3 +9,6 @@ bun.lockb
 memory/
 
 .claude/transcripts/
+
+.build/
+*.app/
