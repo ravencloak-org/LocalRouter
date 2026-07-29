@@ -1,0 +1,48 @@
+// LocalRouter Dashboard — minimal live Event feed.
+// ponytail: Ripple is alpha. This is a starting stub; verify RippleArray reactivity,
+// @for, `component`, and <style> block syntax against ripple-ts.com and adjust.
+import { RippleArray } from "ripple";
+import type { LrEvent } from "../../shared/events";
+
+function summary(ev: LrEvent): string {
+  if (ev.kind === "request")
+    return `${ev.phase}${ev.latencyMs ? ` · ${ev.latencyMs}ms` : ""}${ev.errorType ? ` · ${ev.errorType}` : ""}`;
+  if (ev.kind === "log") return `[${ev.level}] ${ev.msg}`;
+  if (ev.kind === "span") return `${ev.name} · ${ev.durationMs}ms`;
+  return ev.delta; // token
+}
+
+export component App() {
+  const events = new RippleArray<LrEvent>();
+
+  const es = new EventSource("/events");
+  es.onmessage = (m) => {
+    events.push(JSON.parse(m.data) as LrEvent);
+    if (events.length > 500) events.shift();
+  };
+
+  <div class="app">
+    <h1>{"LocalRouter"}</h1>
+    <table>
+      <tbody>
+        @for (const ev of events) {
+          <tr class={ev.kind}>
+            <td>{ev.kind}</td>
+            <td>{("requestId" in ev && ev.requestId) || ""}</td>
+            <td>{summary(ev)}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <style>
+    .app { font-family: ui-monospace, SFMono-Regular, monospace; padding: 1rem; color: #ddd; background: #111; min-height: 100vh; }
+    h1 { font-size: 1rem; opacity: .6; }
+    td { padding: 2px 10px; border-bottom: 1px solid #262626; font-size: 12px; }
+    tr.request td:first-child { color: #6ad; }
+    tr.log td:first-child { color: #e66; }
+    tr.span td:first-child { color: #8c8; }
+    tr.token td:first-child { color: #999; }
+  </style>
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@localrouter/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "ripple": "latest"
+  },
+  "devDependencies": {
+    "vite": "^6",
+    "vite-plugin-ripple": "latest"
+  }
+}
