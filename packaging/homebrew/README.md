@@ -5,12 +5,12 @@ LocalRouter ships two Homebrew artifacts:
 - **Cask** (`Casks/localrouter.rb`) — the macOS menu-bar app (`LocalRouter.app`), from `LocalRouter-macos.zip`.
 - **Formula** (`Formula/localrouter.rb`) — the headless core binary (`localrouter`), for macOS and Linux, arm64 + x64.
 
-These live in a separate tap repo: **`jobinlawrance/homebrew-localrouter`**. Copy the `Casks/` and `Formula/` dirs there (Homebrew requires the `homebrew-` prefix on the repo name; the tap is referenced without it).
+These live in a separate tap repo: **`ravencloak-org/homebrew-localrouter`**. Copy the `Casks/` and `Formula/` dirs there (Homebrew requires the `homebrew-` prefix on the repo name; the tap is referenced without it).
 
 ## Install
 
 ```sh
-brew tap jobinlawrance/localrouter
+brew tap ravencloak-org/localrouter
 ```
 
 Menu-bar app (macOS only):

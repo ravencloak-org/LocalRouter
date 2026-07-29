@@ -5,10 +5,10 @@ cask "localrouter" do
   version "VERSION"
   sha256 "SHA256_MACOS_ZIP"
 
-  url "https://github.com/jobinlawrance/LocalRouter/releases/download/v#{version}/LocalRouter-macos.zip"
+  url "https://github.com/ravencloak-org/LocalRouter/releases/download/v#{version}/LocalRouter-macos.zip"
   name "LocalRouter"
   desc "Menu-bar app for LocalRouter"
-  homepage "https://github.com/jobinlawrance/LocalRouter"
+  homepage "https://github.com/ravencloak-org/LocalRouter"
 
   depends_on macos: ">= :ventura"
 
@@ -20,6 +20,6 @@ cask "localrouter" do
 
     The menu-bar app installed by this cask is the UI only. The headless
     core runs separately — install it with:
-      brew install jobinlawrance/localrouter/localrouter
+      brew install ravencloak-org/localrouter/localrouter
   EOS
 end

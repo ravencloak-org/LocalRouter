@@ -33,7 +33,7 @@
           inherit version;
 
           src = pkgs.fetchurl {
-            url = "https://github.com/jobinlawrance/LocalRouter/releases/download/v${version}/${asset.name}";
+            url = "https://github.com/ravencloak-org/LocalRouter/releases/download/v${version}/${asset.name}";
             hash = asset.sha256;
           };
 
@@ -51,7 +51,7 @@
 
           meta = with pkgs.lib; {
             description = "Headless core + dashboard for LocalRouter";
-            homepage = "https://github.com/jobinlawrance/LocalRouter";
+            homepage = "https://github.com/ravencloak-org/LocalRouter";
             mainProgram = "localrouter";
             platforms = builtins.attrNames assets;
             # `claude` CLI is a runtime dependency the user installs separately.

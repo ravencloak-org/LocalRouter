@@ -3,12 +3,12 @@ class Localrouter < Formula
   # Release automation replaces the SHA256_* placeholders with the real
   # checksums of the matching `localrouter-<os>-<arch>` asset for the tag.
   desc "Headless core for LocalRouter"
-  homepage "https://github.com/jobinlawrance/LocalRouter"
+  homepage "https://github.com/ravencloak-org/LocalRouter"
   version "VERSION"
 
   on_macos do
     on_arm do
-      url "https://github.com/jobinlawrance/LocalRouter/releases/download/v#{version}/localrouter-darwin-arm64"
+      url "https://github.com/ravencloak-org/LocalRouter/releases/download/v#{version}/localrouter-darwin-arm64"
       sha256 "SHA256_DARWIN_ARM64"
 
       def install
@@ -16,7 +16,7 @@ class Localrouter < Formula
       end
     end
     on_intel do
-      url "https://github.com/jobinlawrance/LocalRouter/releases/download/v#{version}/localrouter-darwin-x64"
+      url "https://github.com/ravencloak-org/LocalRouter/releases/download/v#{version}/localrouter-darwin-x64"
       sha256 "SHA256_DARWIN_X64"
 
       def install
@@ -27,7 +27,7 @@ class Localrouter < Formula
 
   on_linux do
     on_arm do
-      url "https://github.com/jobinlawrance/LocalRouter/releases/download/v#{version}/localrouter-linux-arm64"
+      url "https://github.com/ravencloak-org/LocalRouter/releases/download/v#{version}/localrouter-linux-arm64"
       sha256 "SHA256_LINUX_ARM64"
 
       def install
@@ -35,7 +35,7 @@ class Localrouter < Formula
       end
     end
     on_intel do
-      url "https://github.com/jobinlawrance/LocalRouter/releases/download/v#{version}/localrouter-linux-x64"
+      url "https://github.com/ravencloak-org/LocalRouter/releases/download/v#{version}/localrouter-linux-x64"
       sha256 "SHA256_LINUX_X64"
 
       def install

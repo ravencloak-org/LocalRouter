@@ -73,10 +73,20 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
+      - name: Stamp version + checksums into packaging
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          bash scripts/release-fill.sh "$VERSION" artifacts
+          ( cd artifacts && shasum -a 256 localrouter-* LocalRouter-macos.zip > checksums.txt )
+          # ship the filled packaging files as release assets (tap + flake consumers grab these)
+          cp flake.nix artifacts/flake.nix
+          cp packaging/homebrew/Formula/localrouter.rb artifacts/formula-localrouter.rb
+          cp packaging/homebrew/Casks/localrouter.rb   artifacts/cask-localrouter.rb
       - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*
