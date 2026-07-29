@@ -1,9 +1,11 @@
-// LocalRouter Dashboard — control panel + live Event feed.
-// ponytail: Ripple is alpha. Verify RippleArray reactivity, @for, `component`, and the
-// <style> block against ripple-ts.com and adjust. track()/@ confirmed via docs.
-import { RippleArray, track } from "ripple";
+// LocalRouter Dashboard — control bar + live Event feed.
+// ponytail: Ripple 0.3.x (TSRX) — a component is a `function` whose body contains JSX (no
+// `component` keyword). Reactive `@x = v` writes only work at component-body top level, NOT
+// in nested async fns, so the single status line is updated imperatively (plain DOM). The
+// event feed uses the proven RippleArray + @for reactive path.
+import { RippleArray } from "ripple";
 import type { LrEvent } from "../../shared/events";
-import { getStatus, setConfig, login, shutdown, type Status, type Model, type Effort } from "./control";
+import { getStatus, setConfig, login, shutdown, type Model, type Effort } from "./control";
 
 function summary(ev: LrEvent): string {
   if (ev.kind === "request")
@@ -13,18 +15,21 @@ function summary(ev: LrEvent): string {
   return ev.delta; // token
 }
 
-export component App() {
-  // --- control state ---
-  // ponytail: generic type arg on track() — verify the alpha accepts this; if not,
-  // drop it and let inference widen from the null seed.
-  let status = track<Status | null>(null);
-
+export function App() {
+  // --- control: status line updated imperatively (see header note) ---
   async function refresh() {
+    let s = null;
     try {
-      @status = await getStatus();
+      s = await getStatus();
     } catch {
-      @status = null; // core unreachable
+      s = null; // core unreachable
     }
+    const el = document.getElementById("lr-status");
+    if (!el) return;
+    el.textContent = s
+      ? `● running · ${s.model} · effort:${s.effort ?? "—"} · ${s.loggedIn ? "logged in" : "LOGGED OUT"}`
+      : "○ core not reachable";
+    el.className = s && !s.loggedIn ? "stat off" : "stat";
   }
   refresh();
   // ponytail: interval never cleared — the dashboard is one long-lived page, so fine.
@@ -39,7 +44,7 @@ export component App() {
     refresh();
   };
 
-  // --- event feed ---
+  // --- event feed (reactive) ---
   const events = new RippleArray<LrEvent>();
   const es = new EventSource("/events");
   es.onmessage = (m) => {
@@ -47,31 +52,22 @@ export component App() {
     if (events.length > 500) events.shift();
   };
 
-  <div class="app">
+  return <div class="app">
     <h1>{"LocalRouter"}</h1>
 
     <div class="controls">
-      <span class="stat">{@status ? (@status.running ? "● running" : "○ stopped") : "…"}</span>
-      <span class="stat">{"model: "}{@status?.model ?? "?"}</span>
-      <span class="stat">{"effort: "}{@status?.effort ?? "?"}</span>
-      <span class={@status && !@status.loggedIn ? "stat off" : "stat"}>
-        {@status?.loggedIn ? "logged in" : "logged out"}
-      </span>
-
+      <span id="lr-status" class="stat">{"…"}</span>
       <button onClick={() => login()}>{"Login"}</button>
-
       <select onChange={onModel}>
         <option value="sonnet">{"sonnet"}</option>
         <option value="opus">{"opus"}</option>
         <option value="haiku">{"haiku"}</option>
       </select>
-
       <select onChange={onEffort}>
         <option value="low">{"low"}</option>
         <option value="medium">{"medium"}</option>
         <option value="high">{"high"}</option>
       </select>
-
       <button onClick={() => shutdown()}>{"Stop"}</button>
     </div>
 
@@ -86,9 +82,8 @@ export component App() {
         }
       </tbody>
     </table>
-  </div>
 
-  <style>
+    <style>
     .app { font-family: ui-monospace, SFMono-Regular, monospace; padding: 1rem; color: #ddd; background: #111; min-height: 100vh; }
     h1 { font-size: 1rem; opacity: .6; }
     .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #262626; font-size: 12px; }
@@ -102,4 +97,5 @@ export component App() {
     tr.span td:first-child { color: #8c8; }
     tr.token td:first-child { color: #999; }
   </style>
+  </div>
 }

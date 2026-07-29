@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import ripple from "vite-plugin-ripple";
+import { ripple } from "vite-plugin-ripple";
 
 // ponytail: verify the plugin's exact package name/export against ripple-ts.com — Ripple
 // is alpha and this may be `@ripple/vite-plugin` or similar in your pinned version.
