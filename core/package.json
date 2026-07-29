@@ -1,0 +1,11 @@
+{
+  "name": "@localrouter/core",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot server.ts",
+    "start": "bun server.ts"
+  },
+  "dependencies": {
+    "hono": "^4"
+  }
+}

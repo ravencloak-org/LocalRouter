@@ -1,0 +1,11 @@
+{
+  "name": "localrouter",
+  "private": true,
+  "type": "module",
+  "workspaces": ["core", "web"],
+  "scripts": {
+    "dev": "cd core && bun run dev",
+    "web": "cd web && bun run dev",
+    "healthz": "curl -s localhost:8083/healthz | jq"
+  }
+}

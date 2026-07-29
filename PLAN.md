@@ -44,8 +44,48 @@ LLM_API_KEY=dummy
 EMBEDDING_ENDPOINT=http://localhost:8080/v1   # TEI — NOT LocalRouter
 ```
 
+## Decided
+- Stateless: every Request flattens full `messages` → fresh CLI spawn, no session mapping.
+  (OpenAI clients resend full context anyway; sessions add fragile fingerprint matching.)
+
+## Backlog (addon, not v0)
+- Token savers as a pre-CLI proxy layer to cut Claude Code token spend. Prior art:
+  headroomlabs-ai/headroom, teamchong/pxpipe. Slots in front of the CLI bridge once the
+  core + dashboard are solid.
+
+- Concurrency: bounded semaphore, default N=4 (configurable), FIFO overflow queue. Queue
+  depth emitted as an Event (Dashboard backpressure).
+
+## Error handling (decided)
+- OpenAI-shaped error envelope on every failure: `{error:{message,type,code}}` + correct HTTP.
+- Taxonomy → status/type:
+  - CLI missing / not logged in → 503 `cli_unavailable`
+  - CLI non-zero exit / crash    → 502 `upstream_error`
+  - Anthropic rate limit         → 429 `rate_limit_exceeded` (+ Retry-After)
+  - Usage/quota exhausted        → 429 `usage_limit_exceeded`
+  - Per-Request timeout          → 504 `timeout` (kill subprocess, release slot)
+  - Malformed CLI JSON           → 502 `parse_error` (+ stderr snippet)
+  - Embeddings                   → 400 `unsupported`
+  - Bad request                  → 400 `invalid_request_error`
+- Retry ownership: **Core does NOT retry** (Fork 1=A). Maps status + Retry-After; litellm
+  owns retries. No double-retry.
+- Every failure emits an Event (type + stderr snippet) to the Dashboard.
+- Startup auth health-check (Fork 2): probe `claude --version` + cheap auth check on boot;
+  expose `/healthz`; surface CLI-not-logged-in as a red Dashboard banner ("run claude login").
+
+- Streaming: always spawn `--output-format stream-json`; parse token stream once; fan to
+  Dashboard as Events unconditionally. Client `stream:false` → buffer → full `chat.completion`;
+  `stream:true` → forward `chat.completion.chunk` SSE + `[DONE]`. Own one stream-json parser.
+
+## Observability (decided)
+- Event envelope streamed Core→Dashboard over SSE. Kinds: request | log | span | token.
+- OTel instruments the Core internally (span per Request); optional OTLP export behind a
+  flag. Dashboard consumes flattened `span` Events, never raw OTLP.
+- Token granularity: no raw per-token by default; phase transitions + completionTokens tick
+  (~250ms). Raw `token` deltas only for the focused request (on-demand). [scaffold: emits all
+  tokens; throttle+focus is a TODO]
+- Persistence: in-memory ring buffer (last ~1000 Events). No DB in v0. SQLite later if needed.
+
 ## Open questions
-- Streaming: add `--output-format stream-json` → SSE? Or ship non-stream only.
-- Multi-turn: flatten transcript into one prompt vs. use `--resume`/session ids.
-- Concurrency cap: serialize, or pool N subprocesses?
-- Do we need tool-calling for Cognee's structured-extraction prompts, or does text suffice?
+- Tool-calling: does Cognee need structured function outputs, or does text suffice?
+- Per-Request timeout default (seconds). [scaffold default: 300s]
