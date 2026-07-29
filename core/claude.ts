@@ -33,7 +33,14 @@ export class TimeoutError extends Error {
   }
 }
 
-export type ClaudeResult = { text: string; inputTokens: number; outputTokens: number };
+export type ClaudeResult = {
+  text: string;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+};
 
 // Yields text deltas as they arrive; returns final result + usage.
 // Non-stream callers drain the generator and use the return value.
@@ -60,6 +67,9 @@ export async function* runClaude(
   let text = "";
   let inputTokens = 0;
   let outputTokens = 0;
+  let costUsd = 0;
+  let cacheReadTokens = 0;
+  let cacheCreationTokens = 0;
 
   try {
     const reader = proc.stdout.getReader();
@@ -80,8 +90,12 @@ export async function* runClaude(
         } catch {
           continue; // ponytail: tolerate non-JSON noise lines
         }
-        // ponytail: stream-json schema varies by claude version. Verify the event
-        // `type` values + usage key paths against your installed CLI; drift -> parse_error.
+        // Schema verified against claude 2.1.206 stream-json:
+        //   assistant -> .message.content[] {type:"text", text}
+        //   result    -> .result (string), .usage.{input_tokens,output_tokens,
+        //                cache_read_input_tokens,cache_creation_input_tokens}, .total_cost_usd,
+        //                .is_error / .subtype
+        // ponytail: keys may drift across claude versions -> parse_error path.
         if (ev.type === "assistant" && Array.isArray(ev.message?.content)) {
           for (const c of ev.message.content) {
             if (c.type === "text" && c.text) {
@@ -90,10 +104,19 @@ export async function* runClaude(
             }
           }
         } else if (ev.type === "result") {
+          // claude can exit 0 with an errored result — surface it as an upstream failure.
+          if (ev.is_error || (ev.subtype && ev.subtype !== "success")) {
+            throw new CliError(0, String(ev.result ?? ev.api_error_status ?? "claude result error").slice(0, 500));
+          }
           if (typeof ev.result === "string") text = ev.result;
           inputTokens = ev.usage?.input_tokens ?? inputTokens;
           outputTokens = ev.usage?.output_tokens ?? outputTokens;
+          costUsd = ev.total_cost_usd ?? costUsd;
+          cacheReadTokens = ev.usage?.cache_read_input_tokens ?? cacheReadTokens;
+          cacheCreationTokens = ev.usage?.cache_creation_input_tokens ?? cacheCreationTokens;
         }
+        // ponytail: `rate_limit_event` type is emitted too — ignored for now;
+        // wire it to pool backoff + a Dashboard backpressure signal later.
       }
     }
     const code = await proc.exited;
@@ -102,7 +125,7 @@ export async function* runClaude(
       const stderr = await new Response(proc.stderr).text();
       throw new CliError(code, stderr.slice(0, 500));
     }
-    return { text, inputTokens, outputTokens };
+    return { text, inputTokens, outputTokens, costUsd, cacheReadTokens, cacheCreationTokens };
   } finally {
     clearTimeout(killer);
     release();

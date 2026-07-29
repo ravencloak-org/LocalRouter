@@ -2,7 +2,7 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { bus, uid } from "./bus";
-import { runClaude, queueDepth, cliAlive, CliError, TimeoutError } from "./claude";
+import { runClaude, queueDepth, cliAlive, CliError, TimeoutError, type ClaudeResult } from "./claude";
 import type { LrEvent, OpenAIError } from "../shared/events";
 
 const app = new Hono();
@@ -40,11 +40,14 @@ function flatten(messages: any[]): { system: string; prompt: string } {
   return { system, prompt };
 }
 
-function finishReq(requestId: string, model: string, t0: number, pin: number, pout: number) {
+function finishReq(requestId: string, model: string, t0: number, res: ClaudeResult) {
   const durationMs = now() - t0;
-  emit({ kind: "request", requestId, model, phase: "done", latencyMs: durationMs, promptTokens: pin, completionTokens: pout, httpStatus: 200 });
+  emit({ kind: "request", requestId, model, phase: "done", latencyMs: durationMs, promptTokens: res.inputTokens, completionTokens: res.outputTokens, httpStatus: 200 });
   // ponytail: synthesized span, no OTel SDK yet. Swap for a real tracer + OTLP export later.
-  emit({ kind: "span", requestId, traceId: requestId, spanId: uid(), name: "chat.completion", durationMs, attrs: { promptTokens: pin, completionTokens: pout } });
+  emit({
+    kind: "span", requestId, traceId: requestId, spanId: uid(), name: "chat.completion", durationMs,
+    attrs: { promptTokens: res.inputTokens, completionTokens: res.outputTokens, costUsd: res.costUsd, cacheReadTokens: res.cacheReadTokens, cacheCreationTokens: res.cacheCreationTokens },
+  });
 }
 function failReq(requestId: string, model: string, t0: number, httpStatus: number, errorType: string, detail: string) {
   emit({ kind: "request", requestId, model, phase: "error", latencyMs: now() - t0, httpStatus, errorType, preview: detail.slice(0, 120) });
@@ -92,7 +95,7 @@ app.post("/v1/chat/completions", async (c) => {
         }
         await ss.writeSSE({ data: JSON.stringify({ id, object: "chat.completion.chunk", created, model, choices: [{ index: 0, delta: {}, finish_reason: "stop" }] }) });
         await ss.writeSSE({ data: "[DONE]" });
-        finishReq(requestId, model, t0, r.value.inputTokens, r.value.outputTokens);
+        finishReq(requestId, model, t0, r.value);
       } catch (err) {
         const [status, type, detail] = classify(err);
         failReq(requestId, model, t0, status, type, detail);
@@ -108,15 +111,15 @@ app.post("/v1/chat/completions", async (c) => {
     const gen = runClaude(system, prompt);
     let r = await gen.next();
     while (!r.done) r = await gen.next();
-    const { text, inputTokens, outputTokens } = r.value;
-    finishReq(requestId, model, t0, inputTokens, outputTokens);
+    const res = r.value;
+    finishReq(requestId, model, t0, res);
     return c.json({
       id: chatId(),
       object: "chat.completion",
       created: Math.floor(now() / 1000),
       model,
-      choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant", content: text } }],
-      usage: { prompt_tokens: inputTokens, completion_tokens: outputTokens, total_tokens: inputTokens + outputTokens },
+      choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant", content: res.text } }],
+      usage: { prompt_tokens: res.inputTokens, completion_tokens: res.outputTokens, total_tokens: res.inputTokens + res.outputTokens },
     });
   } catch (err) {
     const [status, type, detail] = classify(err);

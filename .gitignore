@@ -7,3 +7,5 @@ bun.lockb
 
 .claude/
 memory/
+
+.claude/transcripts/
