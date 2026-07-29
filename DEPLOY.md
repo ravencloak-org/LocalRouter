@@ -38,7 +38,7 @@ Flake exposes the **headless core** + dashboard:
 1. [ ] `bun build --compile` the core; have it serve the static dashboard at `/`.
 2. [ ] Dashboard control UI (Login / model / effort / stop / status) — universal, all OSes.
 3. [ ] GitHub Actions release workflow (core matrix + dashboard + .app).
-4. [ ] Swift `LocalRouter.app` (macOS menu bar).
+4. [x] Swift `LocalRouter.app` (macOS menu bar). — build-verified; `tray/`, `build-app.sh`.
 5. [ ] Homebrew tap (cask + formula).
 6. [ ] Nix flake (core + dashboard, optional NixOS module).
 7. [ ] Go systray (win/linux) — optional, later.
