@@ -86,6 +86,23 @@ EMBEDDING_ENDPOINT=http://localhost:8080/v1   # TEI — NOT LocalRouter
   tokens; throttle+focus is a TODO]
 - Persistence: in-memory ring buffer (last ~1000 Events). No DB in v0. SQLite later if needed.
 
+## Smoke-test findings (claude 2.1.206, 2026-07-29)
+- Both paths verified end-to-end: non-stream + stream, event feed (queued→spawning→done+span).
+- stream-json schema confirmed; parser handles it + result.is_error. Cost/cache captured to spans.
+- **Context-bloat cost is the real problem.** Every spawn drags the whole global CLAUDE.md +
+  all SessionStart hooks into context: ~144K cache_creation tokens. Cold call = $0.92 for "pong".
+  1h cache amortizes repeats to ~$0.15. For Cognee (many calls) this is a quota/cost hazard.
+  - Fix to test: spawn `claude` with an isolated config (`CLAUDE_CONFIG_DIR=<tmp>`, clean cwd,
+    no project CLAUDE.md) so hooks/global memory don't load → small context per call.
+  - Also what the token-saver backlog (headroom/pxpipe) targets.
+- Latency ~9s/call (hook load + spawn), acceptable but hook-dominated.
+
+## Near-term tasks
+- [ ] Spike isolated-config spawn to kill the 144K context overhead.
+- [ ] Wire `rate_limit_event` → pool backoff + Dashboard backpressure.
+- [ ] Ripple dashboard alpha-syntax pass; token throttle + focus subscription.
+- [ ] Real OTel SDK + optional OTLP export (spans synthesized now).
+
 ## Open questions
 - Tool-calling: does Cognee need structured function outputs, or does text suffice?
 - Per-Request timeout default (seconds). [scaffold default: 300s]
