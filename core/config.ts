@@ -17,15 +17,21 @@ const DEFAULTS: Config = {
 
 export function getConfig(): Config {
   try {
-    return { ...DEFAULTS, ...JSON.parse(readFileSync(FILE, "utf8")) };
+    const file = JSON.parse(readFileSync(FILE, "utf8"));
+    // port is boot-time only (env/default); never let the persisted file override the
+    // bound port. Only model/effort are runtime-tunable via the file.
+    return { ...DEFAULTS, model: file.model ?? DEFAULTS.model, effort: file.effort ?? DEFAULTS.effort };
   } catch {
     return { ...DEFAULTS }; // missing/corrupt file -> defaults
   }
 }
 
 export function setConfig(patch: Partial<Config>): Config {
-  const next = { ...getConfig(), ...patch };
+  const next = getConfig();
+  if (patch.model) next.model = patch.model;
+  if ("effort" in patch) next.effort = patch.effort;
   mkdirSync(DIR, { recursive: true });
-  writeFileSync(FILE, JSON.stringify(next, null, 2));
+  // persist only the runtime-tunable fields (not port)
+  writeFileSync(FILE, JSON.stringify({ model: next.model, effort: next.effort }, null, 2));
   return next;
 }

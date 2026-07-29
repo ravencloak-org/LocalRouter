@@ -1,6 +1,8 @@
 // LocalRouter Core. OpenAI-compatible HTTP -> claude CLI. Emits Events for the Dashboard.
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
+import { serveStatic } from "hono/bun";
+import { existsSync } from "node:fs";
 import { bus, uid } from "./bus";
 import { runClaude, queueDepth, cliAlive, CliError, TimeoutError, type ClaudeResult } from "./claude";
 import { getConfig, setConfig, type Effort } from "./config";
@@ -168,6 +170,23 @@ app.get("/events", (c) =>
     const unsub = bus.subscribe((e) => void ss.writeSSE({ data: JSON.stringify(e) }));
     await new Promise<void>((res) => c.req.raw.signal.addEventListener("abort", () => (unsub(), res())));
   }));
+
+// --- Static dashboard. Registered LAST so /v1/*, /control/*, /events, /healthz win. ---
+// ponytail: root is relative to cwd. Ship the binary next to ./web/dist (scripts/build.sh).
+const distRoot = "./web/dist";
+if (existsSync(`${distRoot}/index.html`)) {
+  app.use("/*", serveStatic({ root: distRoot }));
+  app.get("/*", serveStatic({ path: `${distRoot}/index.html` })); // SPA fallback
+} else {
+  app.get("/*", (c) =>
+    c.html("<!doctype html><title>LocalRouter</title><body style=font-family:system-ui;padding:2rem><h1>LocalRouter</h1><p>dashboard not built — run <code>scripts/build.sh</code></p>", 200));
+}
+
+export const VERSION = "0.1.0";
+if (process.argv.includes("--version")) {
+  console.log(`localrouter ${VERSION}`);
+  process.exit(0); // brew/nix test hook, and CLI convention
+}
 
 const port = getConfig().port;
 console.log(`[LocalRouter] core on 127.0.0.1:${port}`);
