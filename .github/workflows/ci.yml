@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install deps
+        run: bun install
+
+      - name: fallow dead-code (unused exports / files / deps / cycles)
+        run: npx --yes fallow dead-code --fail-on-issues --format github-annotations
+
+      - name: Core compiles to a binary
+        run: cd core && bun build server.ts --compile --outfile /tmp/localrouter
+
+      - name: Dashboard builds
+        run: cd web && bun run build

@@ -1,3 +1,4 @@
+// fallow-ignore-file unused-file -- imported by App.ripple; fallow can't parse .ripple (not TS/JS)
 // LocalRouter control API helpers.
 // All /control/* requests need the X-LocalRouter CSRF header or the core returns 403.
 
