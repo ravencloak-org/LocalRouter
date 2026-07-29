@@ -68,7 +68,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ n: Notification) {
         NSApp.setActivationPolicy(.accessory) // menu-bar only, no Dock icon
-        item.button?.title = "LR"
+        if let icon = loadTrayIcon() {
+            item.button?.image = icon
+            item.button?.imagePosition = .imageLeading
+        } else {
+            item.button?.title = "LR" // fallback if resource missing
+        }
         rebuild()
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in self?.refresh() }
@@ -81,9 +86,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.refresh() }
     }
 
+    func loadTrayIcon() -> NSImage? {
+        guard let url = Bundle.module.url(forResource: "tray", withExtension: "png"),
+              let img = NSImage(contentsOf: url) else { return nil }
+        img.size = NSSize(width: 18, height: 18) // menu-bar height
+        img.isTemplate = false // colored logo, not a monochrome mask
+        return img
+    }
+
     func rebuild() {
         let s = last
-        item.button?.title = s == nil ? "LR ○" : (s!.loggedIn ? "LR ●" : "LR ⚠")
+        // logo image is set once; the title carries the at-a-glance state glyph
+        item.button?.title = s == nil ? " ○" : (s!.loggedIn ? " ●" : " ⚠")
 
         let m = NSMenu()
         let headTitle: String

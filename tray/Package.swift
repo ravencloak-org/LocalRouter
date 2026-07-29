@@ -5,6 +5,10 @@ let package = Package(
     name: "LocalRouterTray",
     platforms: [.macOS(.v12)],
     targets: [
-        .executableTarget(name: "LocalRouterTray", path: "Sources/LocalRouterTray")
+        .executableTarget(
+            name: "LocalRouterTray",
+            path: "Sources/LocalRouterTray",
+            resources: [.process("Resources")]
+        )
     ]
 )
