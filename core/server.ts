@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { bus, uid } from "./bus";
 import { runClaude, queueDepth, cliAlive, CliError, TimeoutError, type ClaudeResult } from "./claude";
+import { getConfig, setConfig, type Effort } from "./config";
 import type { LrEvent, OpenAIError } from "../shared/events";
 
 const app = new Hono();
@@ -128,6 +129,38 @@ app.post("/v1/chat/completions", async (c) => {
   }
 });
 
+// --- Control surface (ADR-0003). Localhost-only + custom-header CSRF guard. ---
+// ponytail: header gate stops drive-by form CSRF (browsers preflight non-simple headers and
+// we set no permissive CORS). A per-boot token is the hardening follow-up.
+app.use("/control/*", async (c, next) => {
+  if (c.req.header("x-localrouter") !== "1")
+    return c.json(errBody("control requires the X-LocalRouter: 1 header", "forbidden"), 403);
+  await next();
+});
+
+app.get("/control/status", async (c) =>
+  c.json({ running: true, loggedIn: await cliAlive(), queueDepth: queueDepth(), ...getConfig() }));
+
+app.post("/control/config", async (c) => {
+  const b = (await c.req.json().catch(() => ({}))) as { model?: string; effort?: string };
+  const patch: { model?: string; effort?: Effort } = {};
+  if (b.model) patch.model = String(b.model);
+  if (b.effort && ["low", "medium", "high"].includes(b.effort)) patch.effort = b.effort as Effort;
+  return c.json(setConfig(patch));
+});
+
+app.post("/control/login", (c) => {
+  // Interactive OAuth: opens a browser. Needs a TTY on headless hosts (see ADR-0003);
+  // the macOS tray runs this in Terminal.app instead.
+  Bun.spawn(["claude", "login"], { stdin: "ignore", stdout: "ignore", stderr: "ignore" });
+  return c.json({ started: true });
+});
+
+app.post("/control/shutdown", (c) => {
+  setTimeout(() => process.exit(0), 100);
+  return c.json({ stopping: true });
+});
+
 // Dashboard feed: replay ring buffer, then live-subscribe until client disconnects.
 app.get("/events", (c) =>
   streamSSE(c, async (ss) => {
@@ -136,6 +169,6 @@ app.get("/events", (c) =>
     await new Promise<void>((res) => c.req.raw.signal.addEventListener("abort", () => (unsub(), res())));
   }));
 
-const port = Number(process.env.LR_PORT ?? 8083);
-console.log(`[LocalRouter] core on :${port}`);
-export default { port, fetch: app.fetch };
+const port = getConfig().port;
+console.log(`[LocalRouter] core on 127.0.0.1:${port}`);
+export default { port, hostname: "127.0.0.1", fetch: app.fetch }; // localhost-only (ADR-0003)
