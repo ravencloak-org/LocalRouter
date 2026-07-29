@@ -1,8 +1,9 @@
-// LocalRouter Dashboard — minimal live Event feed.
-// ponytail: Ripple is alpha. This is a starting stub; verify RippleArray reactivity,
-// @for, `component`, and <style> block syntax against ripple-ts.com and adjust.
-import { RippleArray } from "ripple";
+// LocalRouter Dashboard — control panel + live Event feed.
+// ponytail: Ripple is alpha. Verify RippleArray reactivity, @for, `component`, and the
+// <style> block against ripple-ts.com and adjust. track()/@ confirmed via docs.
+import { RippleArray, track } from "ripple";
 import type { LrEvent } from "../../shared/events";
+import { getStatus, setConfig, login, shutdown, type Status, type Model, type Effort } from "./control";
 
 function summary(ev: LrEvent): string {
   if (ev.kind === "request")
@@ -13,8 +14,33 @@ function summary(ev: LrEvent): string {
 }
 
 export component App() {
-  const events = new RippleArray<LrEvent>();
+  // --- control state ---
+  // ponytail: generic type arg on track() — verify the alpha accepts this; if not,
+  // drop it and let inference widen from the null seed.
+  let status = track<Status | null>(null);
 
+  async function refresh() {
+    try {
+      @status = await getStatus();
+    } catch {
+      @status = null; // core unreachable
+    }
+  }
+  refresh();
+  // ponytail: interval never cleared — the dashboard is one long-lived page, so fine.
+  setInterval(refresh, 5000);
+
+  const onModel = async (e: Event) => {
+    await setConfig({ model: (e.target as HTMLSelectElement).value as Model });
+    refresh();
+  };
+  const onEffort = async (e: Event) => {
+    await setConfig({ effort: (e.target as HTMLSelectElement).value as Effort });
+    refresh();
+  };
+
+  // --- event feed ---
+  const events = new RippleArray<LrEvent>();
   const es = new EventSource("/events");
   es.onmessage = (m) => {
     events.push(JSON.parse(m.data) as LrEvent);
@@ -23,6 +49,32 @@ export component App() {
 
   <div class="app">
     <h1>{"LocalRouter"}</h1>
+
+    <div class="controls">
+      <span class="stat">{@status ? (@status.running ? "● running" : "○ stopped") : "…"}</span>
+      <span class="stat">{"model: "}{@status?.model ?? "?"}</span>
+      <span class="stat">{"effort: "}{@status?.effort ?? "?"}</span>
+      <span class={@status && !@status.loggedIn ? "stat off" : "stat"}>
+        {@status?.loggedIn ? "logged in" : "logged out"}
+      </span>
+
+      <button onClick={() => login()}>{"Login"}</button>
+
+      <select onChange={onModel}>
+        <option value="sonnet">{"sonnet"}</option>
+        <option value="opus">{"opus"}</option>
+        <option value="haiku">{"haiku"}</option>
+      </select>
+
+      <select onChange={onEffort}>
+        <option value="low">{"low"}</option>
+        <option value="medium">{"medium"}</option>
+        <option value="high">{"high"}</option>
+      </select>
+
+      <button onClick={() => shutdown()}>{"Stop"}</button>
+    </div>
+
     <table>
       <tbody>
         @for (const ev of events) {
@@ -39,6 +91,11 @@ export component App() {
   <style>
     .app { font-family: ui-monospace, SFMono-Regular, monospace; padding: 1rem; color: #ddd; background: #111; min-height: 100vh; }
     h1 { font-size: 1rem; opacity: .6; }
+    .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #262626; font-size: 12px; }
+    .stat { color: #aaa; }
+    .stat.off { color: #e66; font-weight: bold; }
+    .controls button, .controls select { font: inherit; font-size: 12px; background: #1a1a1a; color: #ddd; border: 1px solid #333; border-radius: 4px; padding: 3px 8px; cursor: pointer; }
+    .controls button:hover, .controls select:hover { border-color: #555; }
     td { padding: 2px 10px; border-bottom: 1px solid #262626; font-size: 12px; }
     tr.request td:first-child { color: #6ad; }
     tr.log td:first-child { color: #e66; }

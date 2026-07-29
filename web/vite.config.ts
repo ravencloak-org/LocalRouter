@@ -10,6 +10,7 @@ export default defineConfig({
     fs: { allow: [".."] }, // let src import ../shared/events (type-only)
     proxy: {
       "/events": { target: "http://localhost:8083", changeOrigin: true },
+      "/control": "http://localhost:8083",
       "/v1": "http://localhost:8083",
       "/healthz": "http://localhost:8083",
     },
