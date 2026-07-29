@@ -97,8 +97,16 @@ EMBEDDING_ENDPOINT=http://localhost:8080/v1   # TEI — NOT LocalRouter
   - Also what the token-saver backlog (headroom/pxpipe) targets.
 - Latency ~9s/call (hook load + spawn), acceptable but hook-dominated.
 
+## Isolation spike — DONE (2026-07-29)
+- Recipe (keeps OAuth; `--bare` rejected — it forces ANTHROPIC_API_KEY):
+  `--system-prompt <caller|default>  --strict-mcp-config --mcp-config <empty>
+   --setting-sources project  --tools ""`  + neutral (empty) cwd.
+- Result: **161K → 183 tokens/call, $0.92 → $0.0006** (verified through the proxy). Default on
+  (`LR_ISOLATED=0` to opt out). This makes Cognee bulk indexing actually affordable.
+- Note: `--tools ""` also means the CLI has no tools — fine for a text-completion proxy; if
+  tool-calling passthrough is ever added, isolation needs a per-request tool allowlist.
+
 ## Near-term tasks
-- [ ] Spike isolated-config spawn to kill the 144K context overhead.
 - [ ] Wire `rate_limit_event` → pool backoff + Dashboard backpressure.
 - [ ] Ripple dashboard alpha-syntax pass; token throttle + focus subscription.
 - [ ] Real OTel SDK + optional OTLP export (spans synthesized now).

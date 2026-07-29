@@ -1,9 +1,21 @@
 // Spawn the real `claude` CLI, parse stream-json, enforce bounded concurrency.
 // ADR-0002: we drive the genuine CLI (it self-auths); we never touch the OAuth token.
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const MODEL = process.env.LR_MODEL ?? "sonnet";
 const N = Number(process.env.LR_CONCURRENCY ?? 4); // bounded semaphore (PLAN.md)
 const TIMEOUT_MS = Number(process.env.LR_TIMEOUT_MS ?? 300_000);
+
+// Isolation: strip Claude Code's agent context so each spawn is a lean LLM call, not a
+// full coding-agent session. Measured 161K -> ~181 tokens/call, $0.92 -> $0.0006, OAuth intact.
+// (--bare is NOT used: it forces ANTHROPIC_API_KEY and disables OAuth, breaking ADR-0002.)
+const ISOLATED = process.env.LR_ISOLATED !== "0"; // default on
+const ISO_DIR = mkdtempSync(join(tmpdir(), "localrouter-")); // empty cwd: no CLAUDE.md discovery
+const EMPTY_MCP = join(ISO_DIR, "empty-mcp.json");
+writeFileSync(EMPTY_MCP, '{"mcpServers":{}}');
+const DEFAULT_SYSTEM = "You are a helpful assistant.";
 
 // --- bounded semaphore, FIFO overflow ---
 let active = 0;
@@ -50,12 +62,24 @@ export async function* runClaude(
 ): AsyncGenerator<string, ClaudeResult> {
   await acquire();
   const args = ["-p", "--output-format", "stream-json", "--verbose", "--model", MODEL];
-  if (system) args.push("--append-system-prompt", system);
+  if (ISOLATED) {
+    // Replace the default agent prompt with the caller's system message (OpenAI semantics),
+    // and strip MCP tools / user hooks / built-in tools / CLAUDE.md discovery.
+    args.push(
+      "--system-prompt", system || DEFAULT_SYSTEM,
+      "--strict-mcp-config", "--mcp-config", EMPTY_MCP,
+      "--setting-sources", "project", // from ISO_DIR (empty) -> loads nothing
+      "--tools", "", // no built-in tool schemas
+    );
+  } else if (system) {
+    args.push("--append-system-prompt", system);
+  }
   // prompt via stdin: no shell, no arg-length limit, no injection
   const proc = Bun.spawn(["claude", ...args], {
     stdin: Buffer.from(prompt),
     stdout: "pipe",
     stderr: "pipe",
+    cwd: ISOLATED ? ISO_DIR : undefined, // neutral cwd: no project/parent CLAUDE.md
   });
 
   let timedOut = false;
