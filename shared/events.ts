@@ -9,6 +9,7 @@ export type LrEvent =
       id: string;
       ts: number;
       requestId: string;
+      client?: string;
       model: string;
       phase: RequestPhase;
       queueWaitMs?: number;

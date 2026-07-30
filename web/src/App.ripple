@@ -4,7 +4,11 @@
 // Badge/pill class strings are written as literals so Tailwind's scanner includes them.
 import { RippleArray } from "ripple";
 import type { LrEvent } from "../../shared/events";
-import { getStatus, setConfig, login, getRequest, type Model, type Effort } from "./control";
+import {
+  getStatus, setConfig, login, getRequest,
+  listTokens, createToken, revokeToken, getUsage,
+  type Model, type Effort, type Token, type ClientUsage,
+} from "./control";
 
 function summary(ev: LrEvent): string {
   if (ev.kind === "request")
@@ -126,6 +130,50 @@ export function App() {
     if (events.length > 500) events.shift();
   };
 
+  // --- analytics (per-window tiles imperatively; per-client table reactively) ---
+  const clients = new RippleArray<ClientUsage>();
+  const refreshUsage = async () => {
+    let u;
+    try {
+      u = await getUsage();
+    } catch {
+      return;
+    }
+    const set = (id: string, w: { requests: number; completionTokens: number; costUsd: number }) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = `${w.requests} req · ${w.completionTokens} tok · $${w.costUsd.toFixed(4)}`;
+    };
+    set("u-1h", u.windows["1h"]);
+    set("u-24h", u.windows["24h"]);
+    set("u-7d", u.windows["7d"]);
+    while (clients.length) clients.shift();
+    for (const c of u.byClient) clients.push(c);
+  };
+  refreshUsage();
+  setInterval(refreshUsage, 10000);
+
+  // --- client tokens ---
+  const tokens = new RippleArray<Token>();
+  const loadTokens = async () => {
+    const list = await listTokens();
+    while (tokens.length) tokens.shift();
+    for (const t of list) tokens.push(t);
+  };
+  loadTokens();
+  const onCreateToken = async () => {
+    const input = document.getElementById("tok-name") as HTMLInputElement | null;
+    const out = document.getElementById("tok-new");
+    const name = (input?.value ?? "").trim() || "client";
+    const r = await createToken(name);
+    if (out) out.textContent = `${r.name}:  ${r.token}`; // paste into the client's api_key
+    if (input) input.value = "";
+    loadTokens();
+  };
+  const onRevoke = async (token: string) => {
+    await revokeToken(token);
+    loadTokens();
+  };
+
   return <div class="min-h-screen bg-neutral-950 text-neutral-300 antialiased">
     <div class="mx-auto max-w-6xl p-6 space-y-6">
 
@@ -192,6 +240,50 @@ export function App() {
         <p class="mt-3 text-xs text-neutral-600">{"Start / Stop the core from the menu-bar tray. Port applies on restart; env vars win over these fields."}</p>
       </div>
 
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div class="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+          <div class="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-500">{"Usage"}</div>
+          <div class="grid grid-cols-3 gap-3">
+            <div><div class="text-xs text-neutral-500">{"last hour"}</div><div id="u-1h" class="mt-1 text-xs tabular-nums text-neutral-200">{"…"}</div></div>
+            <div><div class="text-xs text-neutral-500">{"last 24h"}</div><div id="u-24h" class="mt-1 text-xs tabular-nums text-neutral-200">{"…"}</div></div>
+            <div><div class="text-xs text-neutral-500">{"last 7d"}</div><div id="u-7d" class="mt-1 text-xs tabular-nums text-neutral-200">{"…"}</div></div>
+          </div>
+          <div class="mt-4 mb-1 text-xs uppercase tracking-wide text-neutral-500">{"By client (7d)"}</div>
+          <table class="w-full text-sm">
+            <tbody>
+              @for (const c of clients) {
+                <tr class="border-b border-neutral-800/50">
+                  <td class="py-1 pr-4 text-neutral-200">{c.client}</td>
+                  <td class="py-1 pr-4 tabular-nums text-neutral-400">{c.requests}{" req"}</td>
+                  <td class="py-1 pr-4 tabular-nums text-neutral-400">{c.completionTokens}{" tok"}</td>
+                  <td class="py-1 tabular-nums text-emerald-400">{"$"}{c.costUsd.toFixed(4)}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+          <div class="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-500">{"Client tokens"}</div>
+          <div class="flex flex-wrap items-center gap-2">
+            <input id="tok-name" type="text" placeholder="client name (e.g. cognee)" class="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 outline-none focus:border-neutral-500" />
+            <button onClick={() => onCreateToken()} class="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-900 hover:bg-white">{"Create token"}</button>
+          </div>
+          <div id="tok-new" class="mt-2 break-all font-mono text-xs text-emerald-400"></div>
+          <table class="mt-3 w-full text-sm">
+            <tbody>
+              @for (const t of tokens) {
+                <tr class="border-b border-neutral-800/50">
+                  <td class="py-1 pr-4 text-neutral-200">{t.name}</td>
+                  <td class="py-1 pr-4 font-mono text-xs text-neutral-500">{t.token}</td>
+                  <td class="py-1 text-right"><button onClick={() => onRevoke(t.token)} class="text-red-400 hover:text-red-300">{"revoke"}</button></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900">
         <div class="border-b border-neutral-800 px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-neutral-500">{"Live requests"}</div>
         <div class="max-h-[26rem] overflow-auto">
@@ -200,6 +292,7 @@ export function App() {
               @for (const ev of events) {
                 <tr class="cursor-pointer border-b border-neutral-800/50 transition hover:bg-neutral-800/40" onClick={() => { if (ev.kind === "request") openDetail(ev.requestId); }}>
                   <td class="w-24 px-4 py-1.5"><span class={badge(ev.kind)}>{ev.kind}</span></td>
+                  <td class="px-4 py-1.5 text-xs text-neutral-400">{("client" in ev && ev.client) || ""}</td>
                   <td class="px-4 py-1.5 font-mono text-xs text-neutral-500">{("requestId" in ev && ev.requestId) || ""}</td>
                   <td class="px-4 py-1.5 text-neutral-300">{summary(ev)}</td>
                 </tr>

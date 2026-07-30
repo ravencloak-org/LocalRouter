@@ -58,23 +58,22 @@ function healthEcho(messages: any[]): string | null {
   return m && String(usr.content).trim() === m[1] ? m[1] : null;
 }
 
-function finishReq(requestId: string, model: string, t0: number, res: ClaudeResult) {
+function finishReq(requestId: string, client: string, model: string, t0: number, res: ClaudeResult) {
   // cost now rides on the request 'done' event — no separate span row cluttering the feed.
-  // Real OTel spans (to OTLP) are a separate TODO, not a feed event.
   emit({
-    kind: "request", requestId, model, phase: "done", latencyMs: now() - t0,
+    kind: "request", requestId, client, model, phase: "done", latencyMs: now() - t0,
     promptTokens: res.inputTokens, completionTokens: res.outputTokens, costUsd: res.costUsd, httpStatus: 200,
   });
 }
-function failReq(requestId: string, model: string, t0: number, httpStatus: number, errorType: string, detail: string) {
-  emit({ kind: "request", requestId, model, phase: "error", latencyMs: now() - t0, httpStatus, errorType, preview: detail.slice(0, 120) });
+function failReq(requestId: string, client: string, model: string, t0: number, httpStatus: number, errorType: string, detail: string) {
+  emit({ kind: "request", requestId, client, model, phase: "error", latencyMs: now() - t0, httpStatus, errorType, preview: detail.slice(0, 120) });
   emit({ kind: "log", level: "error", msg: `${errorType}: ${detail.slice(0, 200)}`, requestId });
 }
 
 // Full request/response capture for the dashboard inspector (ngrok-style), persisted to
 // SQLite so history survives restarts. Bounded to the most recent RECORDS_CAP rows.
 type ReqRecord = {
-  id: string; ts: number; model: string; stream: boolean;
+  id: string; ts: number; client: string; model: string; stream: boolean;
   messages: unknown; response: string;
   promptTokens: number; completionTokens: number; costUsd: number;
   latencyMs: number; httpStatus: number; errorType?: string;
@@ -84,26 +83,83 @@ mkdirSync(DB_DIR, { recursive: true });
 const db = new Database(join(DB_DIR, "requests.db"));
 db.run(
   `CREATE TABLE IF NOT EXISTS requests (
-     id TEXT PRIMARY KEY, ts INTEGER, model TEXT, stream INTEGER, messages TEXT, response TEXT,
+     id TEXT PRIMARY KEY, ts INTEGER, client TEXT, model TEXT, stream INTEGER, messages TEXT, response TEXT,
      promptTokens INTEGER, completionTokens INTEGER, costUsd REAL, latencyMs INTEGER,
      httpStatus INTEGER, errorType TEXT)`,
 );
+try { db.run(`ALTER TABLE requests ADD COLUMN client TEXT`); } catch { /* column exists */ }
 const _insert = db.prepare(
   `INSERT OR REPLACE INTO requests
-     (id,ts,model,stream,messages,response,promptTokens,completionTokens,costUsd,latencyMs,httpStatus,errorType)
-   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+     (id,ts,client,model,stream,messages,response,promptTokens,completionTokens,costUsd,latencyMs,httpStatus,errorType)
+   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 );
 const _get = db.prepare(`SELECT * FROM requests WHERE id = ?`);
-const RECORDS_CAP = 2000;
+
+// usage: numeric rows only (no messages/response), kept long-term for analytics so token/cost
+// history survives the heavy `requests` pruning. "Calculate before deleting" == this table.
+db.run(
+  `CREATE TABLE IF NOT EXISTS usage (
+     id TEXT PRIMARY KEY, ts INTEGER, client TEXT, model TEXT,
+     promptTokens INTEGER, completionTokens INTEGER, costUsd REAL, latencyMs INTEGER, httpStatus INTEGER)`,
+);
+db.run(`CREATE INDEX IF NOT EXISTS usage_ts ON usage(ts)`);
+db.run(`CREATE INDEX IF NOT EXISTS usage_client ON usage(client)`);
+const _usageIns = db.prepare(
+  `INSERT OR REPLACE INTO usage (id,ts,client,model,promptTokens,completionTokens,costUsd,latencyMs,httpStatus)
+   VALUES (?,?,?,?,?,?,?,?,?)`,
+);
+const RECORDS_CAP = 2000; // full req/resp (heavy) for the inspector
+const USAGE_CAP = 200000; // numeric usage rows (light) for analytics
 function putRecord(r: ReqRecord) {
-  _insert.run(r.id, r.ts, r.model, r.stream ? 1 : 0, JSON.stringify(r.messages), r.response,
+  _insert.run(r.id, r.ts, r.client, r.model, r.stream ? 1 : 0, JSON.stringify(r.messages), r.response,
     r.promptTokens, r.completionTokens, r.costUsd, r.latencyMs, r.httpStatus, r.errorType ?? null);
+  _usageIns.run(r.id, r.ts, r.client, r.model, r.promptTokens, r.completionTokens, r.costUsd, r.latencyMs, r.httpStatus);
   db.run(`DELETE FROM requests WHERE id NOT IN (SELECT id FROM requests ORDER BY ts DESC LIMIT ?)`, [RECORDS_CAP]);
+  db.run(`DELETE FROM usage WHERE id NOT IN (SELECT id FROM usage ORDER BY ts DESC LIMIT ?)`, [USAGE_CAP]);
+}
+
+// Analytics over the usage table (survives request pruning).
+function windowStats(sinceMs: number) {
+  return db
+    .query(
+      `SELECT count(*) requests, coalesce(sum(promptTokens),0) promptTokens,
+              coalesce(sum(completionTokens),0) completionTokens, coalesce(sum(costUsd),0) costUsd
+       FROM usage WHERE ts >= ?`,
+    )
+    .get(sinceMs);
+}
+function byClientStats(sinceMs: number) {
+  return db
+    .query(
+      `SELECT client, count(*) requests, coalesce(sum(promptTokens),0) promptTokens,
+              coalesce(sum(completionTokens),0) completionTokens, coalesce(sum(costUsd),0) costUsd
+       FROM usage WHERE ts >= ? GROUP BY client ORDER BY costUsd DESC`,
+    )
+    .all(sinceMs);
 }
 function getRecord(id: string): ReqRecord | undefined {
   const row = _get.get(id) as any;
   if (!row) return undefined;
   return { ...row, stream: !!row.stream, messages: JSON.parse(row.messages), errorType: row.errorType ?? undefined };
+}
+
+// --- Client tokens: map a bearer token -> client name, to tag & filter requests. ---
+db.run(`CREATE TABLE IF NOT EXISTS tokens (token TEXT PRIMARY KEY, name TEXT, created INTEGER)`);
+const _tokIns = db.prepare(`INSERT INTO tokens (token,name,created) VALUES (?,?,?)`);
+const _tokList = db.prepare(`SELECT token,name,created FROM tokens ORDER BY created DESC`);
+const _tokDel = db.prepare(`DELETE FROM tokens WHERE token = ?`);
+const _tokName = db.prepare(`SELECT name FROM tokens WHERE token = ?`);
+const REQUIRE_TOKEN = process.env.LR_REQUIRE_TOKEN === "1"; // reject unregistered tokens
+function createToken(name: string) {
+  const token = "sk-lr-" + crypto.randomUUID().replace(/-/g, "");
+  _tokIns.run(token, name, Date.now());
+  return { token, name };
+}
+function clientForToken(auth: string | undefined): string | null {
+  const t = auth?.replace(/^Bearer\s+/i, "").trim();
+  if (!t) return null;
+  const row = _tokName.get(t) as { name?: string } | undefined;
+  return row?.name ?? null;
 }
 
 app.get("/healthz", async (c) => {
@@ -136,12 +192,16 @@ app.post("/v1/chat/completions", async (c) => {
     });
   }
 
+  const client = clientForToken(c.req.header("authorization")) ?? "unknown";
+  if (REQUIRE_TOKEN && client === "unknown")
+    return c.json(errBody("unknown or missing client token (LR_REQUIRE_TOKEN)", "invalid_api_key"), 401);
+
   const requestId = rid();
   const model = body.model ?? "claude";
   const wantStream = !!body.stream;
   const { system, prompt } = flatten(body.messages);
   const t0 = now();
-  emit({ kind: "request", requestId, model, phase: "queued", queueWaitMs: 0 });
+  emit({ kind: "request", requestId, client, model, phase: "queued", queueWaitMs: 0 });
 
   if (wantStream) {
     return streamSSE(c, async (ss) => {
@@ -149,7 +209,7 @@ app.post("/v1/chat/completions", async (c) => {
       const created = Math.floor(now() / 1000);
       let full = "";
       try {
-        emit({ kind: "request", requestId, model, phase: "streaming" });
+        emit({ kind: "request", requestId, client, model, phase: "streaming" });
         const gen = runClaude(system, prompt);
         let r = await gen.next();
         while (!r.done) {
@@ -164,13 +224,13 @@ app.post("/v1/chat/completions", async (c) => {
         }
         await ss.writeSSE({ data: JSON.stringify({ id, object: "chat.completion.chunk", created, model, choices: [{ index: 0, delta: {}, finish_reason: "stop" }] }) });
         await ss.writeSSE({ data: "[DONE]" });
-        finishReq(requestId, model, t0, r.value);
-        putRecord({ id: requestId, ts: t0, model, stream: true, messages: body.messages, response: full || r.value.text,
+        finishReq(requestId, client, model, t0, r.value);
+        putRecord({ id: requestId, ts: t0, client, model, stream: true, messages: body.messages, response: full || r.value.text,
           promptTokens: r.value.inputTokens, completionTokens: r.value.outputTokens, costUsd: r.value.costUsd, latencyMs: now() - t0, httpStatus: 200 });
       } catch (err) {
         const [status, type, detail] = classify(err);
-        failReq(requestId, model, t0, status, type, detail);
-        putRecord({ id: requestId, ts: t0, model, stream: true, messages: body.messages, response: full || detail,
+        failReq(requestId, client, model, t0, status, type, detail);
+        putRecord({ id: requestId, ts: t0, client, model, stream: true, messages: body.messages, response: full || detail,
           promptTokens: 0, completionTokens: 0, costUsd: 0, latencyMs: now() - t0, httpStatus: status, errorType: type });
         await ss.writeSSE({ data: JSON.stringify(errBody(detail, type)) });
         await ss.writeSSE({ data: "[DONE]" });
@@ -180,13 +240,13 @@ app.post("/v1/chat/completions", async (c) => {
 
   // non-stream: drain generator, return one complete chat.completion
   try {
-    emit({ kind: "request", requestId, model, phase: "spawning" });
+    emit({ kind: "request", requestId, client, model, phase: "spawning" });
     const gen = runClaude(system, prompt);
     let r = await gen.next();
     while (!r.done) r = await gen.next();
     const res = r.value;
-    finishReq(requestId, model, t0, res);
-    putRecord({ id: requestId, ts: t0, model, stream: false, messages: body.messages, response: res.text,
+    finishReq(requestId, client, model, t0, res);
+    putRecord({ id: requestId, ts: t0, client, model, stream: false, messages: body.messages, response: res.text,
       promptTokens: res.inputTokens, completionTokens: res.outputTokens, costUsd: res.costUsd, latencyMs: now() - t0, httpStatus: 200 });
     return c.json({
       id: chatId(),
@@ -198,8 +258,8 @@ app.post("/v1/chat/completions", async (c) => {
     });
   } catch (err) {
     const [status, type, detail] = classify(err);
-    failReq(requestId, model, t0, status, type, detail);
-    putRecord({ id: requestId, ts: t0, model, stream: false, messages: body.messages, response: detail,
+    failReq(requestId, client, model, t0, status, type, detail);
+    putRecord({ id: requestId, ts: t0, client, model, stream: false, messages: body.messages, response: detail,
       promptTokens: 0, completionTokens: 0, costUsd: 0, latencyMs: now() - t0, httpStatus: status, errorType: type });
     return c.json(errBody(detail, type), status as 400 | 429 | 502 | 503 | 504);
   }
@@ -221,6 +281,28 @@ app.get("/control/status", async (c) =>
 app.get("/control/requests/:id", (c) => {
   const r = getRecord(c.req.param("id"));
   return r ? c.json(r) : c.json(errBody("no record for that id", "not_found"), 404);
+});
+
+// Client tokens: create one per client (cognee, continue, ...), use it as the OpenAI api_key,
+// and requests get tagged with the client name for filtering.
+app.get("/control/tokens", (c) => c.json(_tokList.all()));
+app.post("/control/tokens", async (c) => {
+  const b = (await c.req.json().catch(() => ({}))) as { name?: string };
+  const name = (b.name ?? "").trim() || "client";
+  return c.json(createToken(name));
+});
+app.delete("/control/tokens/:token", (c) => {
+  _tokDel.run(c.req.param("token"));
+  return c.json({ ok: true });
+});
+
+// Usage analytics: token/cost per time window + per client (from the durable `usage` table).
+app.get("/control/usage", (c) => {
+  const t = Date.now(), h = 3600e3, d = 24 * h, w = 7 * d;
+  return c.json({
+    windows: { "1h": windowStats(t - h), "24h": windowStats(t - d), "7d": windowStats(t - w), all: windowStats(0) },
+    byClient: byClientStats(t - w), // last 7d, per client
+  });
 });
 
 app.post("/control/config", async (c) => {

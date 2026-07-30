@@ -31,6 +31,7 @@ export async function getStatus(): Promise<Status> {
 export interface ReqRecord {
   id: string;
   ts: number;
+  client: string;
   model: string;
   stream: boolean;
   messages: unknown;
@@ -47,6 +48,46 @@ export async function getRequest(id: string): Promise<ReqRecord> {
   const r = await ctl(`requests/${id}`);
   if (!r.ok) throw new Error(`request ${r.status}`);
   return r.json() as Promise<ReqRecord>;
+}
+
+export interface Token {
+  token: string;
+  name: string;
+  created: number;
+}
+export async function listTokens(): Promise<Token[]> {
+  const r = await ctl("tokens");
+  return r.ok ? (r.json() as Promise<Token[]>) : [];
+}
+export async function createToken(name: string): Promise<{ token: string; name: string }> {
+  const r = await ctl("tokens", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  return r.json() as Promise<{ token: string; name: string }>;
+}
+export async function revokeToken(token: string): Promise<void> {
+  await ctl(`tokens/${encodeURIComponent(token)}`, { method: "DELETE" });
+}
+
+export interface UsageWindow {
+  requests: number;
+  promptTokens: number;
+  completionTokens: number;
+  costUsd: number;
+}
+export interface ClientUsage extends UsageWindow {
+  client: string;
+}
+export interface Usage {
+  windows: { "1h": UsageWindow; "24h": UsageWindow; "7d": UsageWindow; all: UsageWindow };
+  byClient: ClientUsage[];
+}
+export async function getUsage(): Promise<Usage> {
+  const r = await ctl("usage");
+  if (!r.ok) throw new Error(`usage ${r.status}`);
+  return r.json() as Promise<Usage>;
 }
 
 export async function setConfig(
