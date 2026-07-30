@@ -12,6 +12,7 @@ export interface Status {
   effort?: Effort;
   queueDepth: number;
   port: number;
+  anthropicBaseUrl?: string;
 }
 
 async function ctl(path: string, init?: RequestInit): Promise<Response> {
@@ -27,7 +28,9 @@ export async function getStatus(): Promise<Status> {
   return r.json() as Promise<Status>;
 }
 
-export async function setConfig(cfg: { model?: Model; effort?: Effort }): Promise<void> {
+export async function setConfig(
+  cfg: { model?: Model; effort?: Effort; port?: number; anthropicBaseUrl?: string },
+): Promise<void> {
   await ctl("config", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

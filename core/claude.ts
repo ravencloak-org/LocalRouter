@@ -61,7 +61,7 @@ export async function* runClaude(
   prompt: string,
 ): AsyncGenerator<string, ClaudeResult> {
   await acquire();
-  const { model, effort } = getConfig(); // live: tray/dashboard changes apply next request
+  const { model, effort, anthropicBaseUrl } = getConfig(); // live: dashboard changes apply next request
   const args = ["-p", "--output-format", "stream-json", "--verbose", "--model", model];
   if (effort) args.push("--effort", effort); // level selector: low|medium|high
   if (ISOLATED) {
@@ -82,6 +82,8 @@ export async function* runClaude(
     stdout: "pipe",
     stderr: "pipe",
     cwd: ISOLATED ? ISO_DIR : undefined, // neutral cwd: no project/parent CLAUDE.md
+    // route the CLI at a custom Anthropic endpoint (gateway/OpenRouter/mock) when configured
+    env: anthropicBaseUrl ? { ...process.env, ANTHROPIC_BASE_URL: anthropicBaseUrl } : undefined,
   });
 
   let timedOut = false;

@@ -27,9 +27,16 @@ export function App() {
     const el = document.getElementById("lr-status");
     if (!el) return;
     el.textContent = s
-      ? `● running · ${s.model} · effort:${s.effort ?? "—"} · ${s.loggedIn ? "logged in" : "LOGGED OUT"}`
+      ? `● :${s.port} · ${s.model} · effort:${s.effort ?? "—"} · ${s.loggedIn ? "logged in" : "LOGGED OUT"}${s.anthropicBaseUrl ? " · " + s.anthropicBaseUrl : ""}`
       : "○ core not reachable";
     el.className = s && !s.loggedIn ? "stat off" : "stat";
+    // reflect current values into inputs (only when the user isn't editing them)
+    if (s) {
+      const p = document.getElementById("lr-port") as HTMLInputElement | null;
+      if (p && document.activeElement !== p) p.value = String(s.port);
+      const u = document.getElementById("lr-baseurl") as HTMLInputElement | null;
+      if (u && document.activeElement !== u) u.value = s.anthropicBaseUrl ?? "";
+    }
   }
   refresh();
   // ponytail: interval never cleared — the dashboard is one long-lived page, so fine.
@@ -41,6 +48,17 @@ export function App() {
   };
   const onEffort = async (e: Event) => {
     await setConfig({ effort: (e.target as HTMLSelectElement).value as Effort });
+    refresh();
+  };
+  const onPort = async (e: Event) => {
+    const v = Number((e.target as HTMLInputElement).value);
+    if (v > 0 && v < 65536) {
+      await setConfig({ port: v });
+      refresh(); // note: applies on core restart
+    }
+  };
+  const onBaseUrl = async (e: Event) => {
+    await setConfig({ anthropicBaseUrl: (e.target as HTMLInputElement).value.trim() });
     refresh();
   };
 
@@ -68,6 +86,8 @@ export function App() {
         <option value="medium">{"medium"}</option>
         <option value="high">{"high"}</option>
       </select>
+      <label class="fld">{"port"}<input id="lr-port" type="number" min="1" max="65535" onChange={onPort} title="applies on core restart" /></label>
+      <label class="fld">{"anthropic url"}<input id="lr-baseurl" type="text" placeholder="default" onChange={onBaseUrl} title="ANTHROPIC_BASE_URL for the CLI; blank = default" /></label>
       <button onClick={() => shutdown()}>{"Stop"}</button>
     </div>
 
@@ -89,8 +109,12 @@ export function App() {
     .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #262626; font-size: 12px; }
     .stat { color: #aaa; }
     .stat.off { color: #e66; font-weight: bold; }
-    .controls button, .controls select { font: inherit; font-size: 12px; background: #1a1a1a; color: #ddd; border: 1px solid #333; border-radius: 4px; padding: 3px 8px; cursor: pointer; }
-    .controls button:hover, .controls select:hover { border-color: #555; }
+    .controls button, .controls select, .controls input { font: inherit; font-size: 12px; background: #1a1a1a; color: #ddd; border: 1px solid #333; border-radius: 4px; padding: 3px 8px; }
+    .controls button, .controls select { cursor: pointer; }
+    .controls button:hover, .controls select:hover, .controls input:focus { border-color: #555; }
+    .controls .fld { display: flex; gap: 4px; align-items: center; }
+    .controls #lr-port { width: 64px; }
+    .controls #lr-baseurl { width: 200px; }
     td { padding: 2px 10px; border-bottom: 1px solid #262626; font-size: 12px; }
     tr.request td:first-child { color: #6ad; }
     tr.log td:first-child { color: #e66; }

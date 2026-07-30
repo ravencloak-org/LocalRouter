@@ -5,7 +5,7 @@ import { serveStatic } from "hono/bun";
 import { existsSync } from "node:fs";
 import { bus, uid } from "./bus";
 import { runClaude, queueDepth, cliAlive, CliError, TimeoutError, type ClaudeResult } from "./claude";
-import { getConfig, setConfig, type Effort } from "./config";
+import { getConfig, setConfig, type Effort, type Config } from "./config";
 import type { LrEvent, OpenAIError } from "../shared/events";
 
 const app = new Hono();
@@ -144,10 +144,17 @@ app.get("/control/status", async (c) =>
   c.json({ running: true, loggedIn: await cliAlive(), queueDepth: queueDepth(), ...getConfig() }));
 
 app.post("/control/config", async (c) => {
-  const b = (await c.req.json().catch(() => ({}))) as { model?: string; effort?: string };
-  const patch: { model?: string; effort?: Effort } = {};
+  const b = (await c.req.json().catch(() => ({}))) as {
+    model?: string; effort?: string; port?: number | string; anthropicBaseUrl?: string;
+  };
+  const patch: Partial<Config> = {};
   if (b.model) patch.model = String(b.model);
   if (b.effort && ["low", "medium", "high"].includes(b.effort)) patch.effort = b.effort as Effort;
+  if (b.port != null) {
+    const p = Number(b.port);
+    if (Number.isInteger(p) && p > 0 && p < 65536) patch.port = p; // applies on restart
+  }
+  if ("anthropicBaseUrl" in b) patch.anthropicBaseUrl = b.anthropicBaseUrl ? String(b.anthropicBaseUrl) : undefined;
   return c.json(setConfig(patch));
 });
 
