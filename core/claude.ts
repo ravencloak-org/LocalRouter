@@ -163,6 +163,10 @@ export async function* runClaude(
 // Cheap liveness probe for /healthz. ponytail: version-only; a real auth probe costs
 // tokens, so we treat the first request-time 503/auth error as the auth signal instead.
 export async function cliAlive(): Promise<boolean> {
-  const proc = Bun.spawn(["claude", "--version"], { stdout: "ignore", stderr: "ignore" });
-  return (await proc.exited) === 0;
+  try {
+    const proc = Bun.spawn(["claude", "--version"], { stdout: "ignore", stderr: "ignore" });
+    return (await proc.exited) === 0;
+  } catch {
+    return false; // `claude` not on PATH (e.g. under launchd) -> clean 503, not a 500
+  }
 }

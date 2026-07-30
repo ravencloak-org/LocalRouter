@@ -13,7 +13,7 @@ import type { LrEvent, OpenAIError } from "../shared/events";
 
 const app = new Hono();
 const now = () => Date.now();
-const rid = () => `req-${crypto.randomUUID().slice(0, 8)}`;
+const rid = () => crypto.randomUUID().slice(0, 8); // git-short-SHA style, no prefix
 const chatId = () => `chatcmpl-${crypto.randomUUID().slice(0, 12)}`;
 
 function emit(e: Omit<LrEvent, "id" | "ts">) {
