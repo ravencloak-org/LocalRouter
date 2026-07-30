@@ -149,8 +149,13 @@ const _tokIns = db.prepare(`INSERT INTO tokens (token,name,created) VALUES (?,?,
 const _tokList = db.prepare(`SELECT token,name,created FROM tokens ORDER BY created DESC`);
 const _tokDel = db.prepare(`DELETE FROM tokens WHERE token = ?`);
 const _tokName = db.prepare(`SELECT name FROM tokens WHERE token = ?`);
+const _tokByName = db.prepare(`SELECT token,name FROM tokens WHERE name = ?`);
+db.run(`DELETE FROM tokens WHERE rowid NOT IN (SELECT min(rowid) FROM tokens GROUP BY name)`); // dedupe first
+db.run(`CREATE UNIQUE INDEX IF NOT EXISTS tokens_name ON tokens(name)`); // names are unique
 const REQUIRE_TOKEN = process.env.LR_REQUIRE_TOKEN === "1"; // reject unregistered tokens
 function createToken(name: string) {
+  const existing = _tokByName.get(name) as { token: string; name: string } | undefined;
+  if (existing) return existing; // unique name -> idempotent (return the same token)
   const token = "sk-lr-" + crypto.randomUUID().replace(/-/g, "");
   _tokIns.run(token, name, Date.now());
   return { token, name };
