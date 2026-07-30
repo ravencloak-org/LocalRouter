@@ -10,20 +10,25 @@ import {
   type Model, type Effort, type Token, type ClientUsage,
 } from "./control";
 
-function summary(ev: LrEvent): string {
-  if (ev.kind === "request")
-    return `${ev.phase}${ev.latencyMs ? ` · ${ev.latencyMs}ms` : ""}${ev.errorType ? ` · ${ev.errorType}` : ""}`;
-  if (ev.kind === "log") return `[${ev.level}] ${ev.msg}`;
-  if (ev.kind === "span") return `${ev.name} · ${ev.durationMs}ms`;
-  return ev.delta; // token
+// One request = one row (consolidated across queued/spawning/done). Phase-colored dot.
+type Row = {
+  id: string; client: string; model: string; phase: string; ts: number;
+  latencyMs?: number; completionTokens?: number; costUsd?: number; httpStatus?: number; errorType?: string;
+  phases: { phase: string; ts: number }[];
+};
+function phaseColor(phase: string, httpStatus?: number): string {
+  if (phase === "error" || (httpStatus != null && httpStatus >= 400)) return "bg-red-500";
+  if (phase === "done") return "bg-emerald-500";
+  return "bg-amber-500"; // queued / spawning / streaming
 }
-
-function badge(kind: string): string {
-  const base = "inline-block px-2 py-0.5 rounded-md text-xs font-medium ";
-  if (kind === "request") return base + "bg-sky-500/15 text-sky-300";
-  if (kind === "log") return base + "bg-red-500/15 text-red-300";
-  if (kind === "span") return base + "bg-emerald-500/15 text-emerald-300";
-  return base + "bg-neutral-700/40 text-neutral-400"; // token
+function rowLine(r: Row): string {
+  const bits: string[] = [r.phase];
+  if (r.latencyMs) bits.push(`${r.latencyMs}ms`);
+  if (r.completionTokens) bits.push(`${r.completionTokens}t`);
+  if (r.costUsd) bits.push(`$${r.costUsd.toFixed(4)}`);
+  if (r.errorType) bits.push(r.errorType);
+  if (r.httpStatus && r.httpStatus >= 400) bits.push(String(r.httpStatus));
+  return bits.join(" · ");
 }
 
 function reqCount(evs: RippleArray<LrEvent>): number {
@@ -94,40 +99,65 @@ export function App() {
     refresh();
   };
 
-  // ngrok-style inspector: click a request row -> full req/resp in a side drawer.
-  // Imperative DOM (reactive @-writes don't work in nested async on this Ripple).
-  const openDetail = async (id: string) => {
-    const drawer = document.getElementById("lr-drawer");
-    const meta = document.getElementById("lr-d-meta");
-    const req = document.getElementById("lr-d-req");
-    const res = document.getElementById("lr-d-res");
-    if (!drawer || !meta || !req || !res) return;
-    meta.textContent = "loading…";
-    req.textContent = "";
-    res.textContent = "";
-    drawer.style.display = "block";
-    try {
-      const r = await getRequest(id);
-      meta.textContent =
-        `${r.model} · ${r.stream ? "stream" : "non-stream"} · HTTP ${r.httpStatus} · ` +
-        `${r.promptTokens}+${r.completionTokens} tok · ${r.latencyMs}ms · $${(r.costUsd ?? 0).toFixed(4)}` +
-        (r.errorType ? ` · ${r.errorType}` : "");
-      req.textContent = JSON.stringify(r.messages, null, 2);
-      res.textContent = r.response ?? "";
-    } catch {
-      meta.textContent = "no record (evicted, or not a chat request)";
-    }
-  };
-  const closeDetail = () => {
-    const d = document.getElementById("lr-drawer");
-    if (d) d.style.display = "none";
-  };
-
-  const events = new RippleArray<LrEvent>();
+  // Consolidate: one row per requestId (request events only — logs/tokens excluded).
+  const rowMap = new Map<string, Row>();
+  const rows = new RippleArray<Row>();
+  function syncRows() {
+    const arr = [...rowMap.values()].sort((a, b) => b.ts - a.ts).slice(0, 300);
+    while (rows.length) rows.shift();
+    for (const r of arr) rows.push(r);
+  }
+  const events = new RippleArray<LrEvent>(); // kept for the top stat tiles
   const es = new EventSource("/events");
   es.onmessage = (m) => {
-    events.push(JSON.parse(m.data) as LrEvent);
+    const ev = JSON.parse(m.data) as LrEvent;
+    events.push(ev);
     if (events.length > 500) events.shift();
+    if (ev.kind !== "request") return; // logs/tokens/spans are not request rows
+    let r = rowMap.get(ev.requestId);
+    if (!r) {
+      r = { id: ev.requestId, client: ev.client ?? "unknown", model: ev.model, phase: ev.phase, ts: ev.ts, phases: [] };
+      rowMap.set(ev.requestId, r);
+    }
+    r.phase = ev.phase;
+    r.ts = ev.ts;
+    r.phases.push({ phase: ev.phase, ts: ev.ts });
+    if (ev.client && ev.client !== "unknown") r.client = ev.client;
+    if (ev.latencyMs != null) r.latencyMs = ev.latencyMs;
+    if (ev.completionTokens != null) r.completionTokens = ev.completionTokens;
+    if (ev.costUsd != null) r.costUsd = ev.costUsd;
+    if (ev.httpStatus != null) r.httpStatus = ev.httpStatus;
+    if (ev.errorType) r.errorType = ev.errorType;
+    if (rowMap.size > 300) {
+      const oldest = [...rowMap.values()].sort((a, b) => a.ts - b.ts)[0];
+      if (oldest) rowMap.delete(oldest.id);
+    }
+    syncRows();
+  };
+
+  // master-detail: click a row -> transitions timeline + full req/resp (imperative DOM).
+  const selectRow = async (id: string) => {
+    const r = rowMap.get(id);
+    document.querySelectorAll("[data-row]").forEach((el) => {
+      (el as HTMLElement).style.background = (el as HTMLElement).dataset.row === id ? "rgba(56,189,248,0.08)" : "";
+    });
+    const head = document.getElementById("d-head");
+    const meta = document.getElementById("d-meta");
+    const tl = document.getElementById("d-timeline");
+    const req = document.getElementById("d-req");
+    const res = document.getElementById("d-res");
+    if (head) head.textContent = id;
+    if (meta && r) meta.textContent = `${r.client} · ${r.model} · ${rowLine(r)}`;
+    if (tl && r) tl.textContent = r.phases.map((p) => `${p.phase.padEnd(10)} ${new Date(p.ts).toLocaleTimeString()}`).join("\n");
+    if (req) req.textContent = "loading…";
+    if (res) res.textContent = "";
+    try {
+      const rec = await getRequest(id);
+      if (req) req.textContent = JSON.stringify(rec.messages, null, 2);
+      if (res) res.textContent = rec.response ?? "";
+    } catch {
+      if (req) req.textContent = "no stored body (rejected request or evicted)";
+    }
   };
 
   // --- analytics (per-window tiles imperatively; per-client table reactively) ---
@@ -284,37 +314,36 @@ export function App() {
         </div>
       </div>
 
-      <div class="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900">
-        <div class="border-b border-neutral-800 px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-neutral-500">{"Live requests"}</div>
-        <div class="max-h-[26rem] overflow-auto">
-          <table class="w-full text-sm">
-            <tbody>
-              @for (const ev of events) {
-                <tr class="cursor-pointer border-b border-neutral-800/50 transition hover:bg-neutral-800/40" onClick={() => { if (ev.kind === "request") openDetail(ev.requestId); }}>
-                  <td class="w-24 px-4 py-1.5"><span class={badge(ev.kind)}>{ev.kind}</span></td>
-                  <td class="px-4 py-1.5 text-xs text-neutral-400">{("client" in ev && ev.client) || ""}</td>
-                  <td class="px-4 py-1.5 font-mono text-xs text-neutral-500">{("requestId" in ev && ev.requestId) || ""}</td>
-                  <td class="px-4 py-1.5 text-neutral-300">{summary(ev)}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,22rem)_1fr]">
+        <div class="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900">
+          <div class="border-b border-neutral-800 px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-neutral-500">{"Requests"}</div>
+          <div class="max-h-[32rem] overflow-auto">
+            @for (const r of rows) {
+              <button data-row={r.id} onClick={() => selectRow(r.id)} class="flex w-full items-center gap-2 border-b border-neutral-800/50 px-3 py-2 text-left transition hover:bg-neutral-800/40">
+                <span class={"h-2 w-2 shrink-0 rounded-full " + phaseColor(r.phase, r.httpStatus)}></span>
+                <span class="w-24 shrink-0 truncate font-mono text-xs text-neutral-400">{r.id}</span>
+                <span class="w-16 shrink-0 truncate text-xs text-sky-300">{r.client}</span>
+                <span class="flex-1 truncate text-xs text-neutral-400">{rowLine(r)}</span>
+              </button>
+            }
+          </div>
         </div>
-      </div>
 
-      <div id="lr-drawer" class="fixed inset-y-0 right-0 z-50 w-[42rem] max-w-full space-y-4 overflow-auto border-l border-neutral-800 bg-neutral-900 p-5 shadow-2xl" style="display:none">
-        <div class="flex items-center justify-between">
-          <h2 class="text-sm font-semibold text-neutral-100">{"Request detail"}</h2>
-          <button onClick={() => closeDetail()} class="text-neutral-500 hover:text-neutral-200">{"✕"}</button>
-        </div>
-        <div id="lr-d-meta" class="font-mono text-xs text-neutral-400"></div>
-        <div>
-          <div class="mb-1 text-xs uppercase tracking-wide text-neutral-500">{"Request"}</div>
-          <pre id="lr-d-req" class="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-xs text-neutral-300"></pre>
-        </div>
-        <div>
-          <div class="mb-1 text-xs uppercase tracking-wide text-neutral-500">{"Response"}</div>
-          <pre id="lr-d-res" class="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-xs text-neutral-300"></pre>
+        <div class="space-y-4 rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+          <div id="d-head" class="text-sm font-semibold text-neutral-100">{"Select a request"}</div>
+          <div id="d-meta" class="font-mono text-xs text-neutral-400"></div>
+          <div>
+            <div class="mb-1 text-xs uppercase tracking-wide text-neutral-500">{"Transitions"}</div>
+            <pre id="d-timeline" class="whitespace-pre-wrap rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-xs text-neutral-300"></pre>
+          </div>
+          <div>
+            <div class="mb-1 text-xs uppercase tracking-wide text-neutral-500">{"Request"}</div>
+            <pre id="d-req" class="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-xs text-neutral-300"></pre>
+          </div>
+          <div>
+            <div class="mb-1 text-xs uppercase tracking-wide text-neutral-500">{"Response"}</div>
+            <pre id="d-res" class="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-xs text-neutral-300"></pre>
+          </div>
         </div>
       </div>
 

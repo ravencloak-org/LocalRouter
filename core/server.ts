@@ -198,14 +198,22 @@ app.post("/v1/chat/completions", async (c) => {
   }
 
   const client = clientForToken(c.req.header("authorization")) ?? "unknown";
-  if (REQUIRE_TOKEN && client === "unknown")
-    return c.json(errBody("unknown or missing client token (LR_REQUIRE_TOKEN)", "invalid_api_key"), 401);
-
   const requestId = rid();
   const model = body.model ?? "claude";
   const wantStream = !!body.stream;
   const { system, prompt } = flatten(body.messages);
   const t0 = now();
+
+  if (REQUIRE_TOKEN && client === "unknown") {
+    // surface the 401 as a request row (not silent)
+    emit({ kind: "request", requestId, client, model, phase: "queued", queueWaitMs: 0 });
+    failReq(requestId, client, model, t0, 401, "invalid_api_key", "unknown or missing client token");
+    putRecord({ id: requestId, ts: t0, client, model, stream: wantStream, messages: body.messages,
+      response: "unknown or missing client token (LR_REQUIRE_TOKEN)", promptTokens: 0, completionTokens: 0,
+      costUsd: 0, latencyMs: 0, httpStatus: 401, errorType: "invalid_api_key" });
+    return c.json(errBody("unknown or missing client token (LR_REQUIRE_TOKEN)", "invalid_api_key"), 401);
+  }
+
   emit({ kind: "request", requestId, client, model, phase: "queued", queueWaitMs: 0 });
 
   if (wantStream) {
