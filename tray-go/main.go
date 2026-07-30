@@ -20,6 +20,17 @@ import (
 //go:embed icon.png
 var iconPNG []byte
 
+//go:embed icon.ico
+var iconICO []byte
+
+// trayIcon returns the format systray wants per OS: ICO on Windows, PNG elsewhere.
+func trayIcon() []byte {
+	if runtime.GOOS == "windows" {
+		return iconICO
+	}
+	return iconPNG
+}
+
 var (
 	base      = envOr("LR_BASE", "http://127.0.0.1:8083")
 	dashboard = envOr("LR_DASHBOARD", "http://127.0.0.1:5173")
@@ -137,7 +148,7 @@ func updateUI(s *status) {
 }
 
 func onReady() {
-	systray.SetIcon(iconPNG) // ponytail: PNG works on linux; Windows wants ICO (TODO: embed .ico)
+	systray.SetIcon(trayIcon()) // ICO on Windows, PNG on linux/mac
 	systray.SetTitle("LR")
 	systray.SetTooltip("LocalRouter")
 
