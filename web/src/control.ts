@@ -28,6 +28,27 @@ export async function getStatus(): Promise<Status> {
   return r.json() as Promise<Status>;
 }
 
+export interface ReqRecord {
+  id: string;
+  ts: number;
+  model: string;
+  stream: boolean;
+  messages: unknown;
+  response: string;
+  promptTokens: number;
+  completionTokens: number;
+  costUsd: number;
+  latencyMs: number;
+  httpStatus: number;
+  errorType?: string;
+}
+
+export async function getRequest(id: string): Promise<ReqRecord> {
+  const r = await ctl(`requests/${id}`);
+  if (!r.ok) throw new Error(`request ${r.status}`);
+  return r.json() as Promise<ReqRecord>;
+}
+
 export async function setConfig(
   cfg: { model?: Model; effort?: Effort; port?: number; anthropicBaseUrl?: string },
 ): Promise<void> {

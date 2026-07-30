@@ -58,6 +58,20 @@ function failReq(requestId: string, model: string, t0: number, httpStatus: numbe
   emit({ kind: "log", level: "error", msg: `${errorType}: ${detail.slice(0, 200)}`, requestId });
 }
 
+// Full request/response capture for the dashboard inspector (ngrok-style). Bounded map.
+type ReqRecord = {
+  id: string; ts: number; model: string; stream: boolean;
+  messages: unknown; response: string;
+  promptTokens: number; completionTokens: number; costUsd: number;
+  latencyMs: number; httpStatus: number; errorType?: string;
+};
+const records = new Map<string, ReqRecord>();
+const RECORDS_CAP = 200;
+function putRecord(r: ReqRecord) {
+  records.set(r.id, r);
+  if (records.size > RECORDS_CAP) records.delete(records.keys().next().value as string);
+}
+
 app.get("/healthz", async (c) => {
   const ok = await cliAlive();
   return c.json({ status: ok ? "ok" : "cli_unavailable", queueDepth: queueDepth() }, ok ? 200 : 503);
@@ -84,11 +98,13 @@ app.post("/v1/chat/completions", async (c) => {
     return streamSSE(c, async (ss) => {
       const id = chatId();
       const created = Math.floor(now() / 1000);
+      let full = "";
       try {
         emit({ kind: "request", requestId, model, phase: "streaming" });
         const gen = runClaude(system, prompt);
         let r = await gen.next();
         while (!r.done) {
+          full += r.value;
           // ponytail: also broadcasts every token to all /events subscribers; add
           // throttle + focus-only subscription per PLAN.md before this gets loud.
           emit({ kind: "token", requestId, delta: r.value });
@@ -100,9 +116,13 @@ app.post("/v1/chat/completions", async (c) => {
         await ss.writeSSE({ data: JSON.stringify({ id, object: "chat.completion.chunk", created, model, choices: [{ index: 0, delta: {}, finish_reason: "stop" }] }) });
         await ss.writeSSE({ data: "[DONE]" });
         finishReq(requestId, model, t0, r.value);
+        putRecord({ id: requestId, ts: t0, model, stream: true, messages: body.messages, response: full || r.value.text,
+          promptTokens: r.value.inputTokens, completionTokens: r.value.outputTokens, costUsd: r.value.costUsd, latencyMs: now() - t0, httpStatus: 200 });
       } catch (err) {
         const [status, type, detail] = classify(err);
         failReq(requestId, model, t0, status, type, detail);
+        putRecord({ id: requestId, ts: t0, model, stream: true, messages: body.messages, response: full || detail,
+          promptTokens: 0, completionTokens: 0, costUsd: 0, latencyMs: now() - t0, httpStatus: status, errorType: type });
         await ss.writeSSE({ data: JSON.stringify(errBody(detail, type)) });
         await ss.writeSSE({ data: "[DONE]" });
       }
@@ -117,6 +137,8 @@ app.post("/v1/chat/completions", async (c) => {
     while (!r.done) r = await gen.next();
     const res = r.value;
     finishReq(requestId, model, t0, res);
+    putRecord({ id: requestId, ts: t0, model, stream: false, messages: body.messages, response: res.text,
+      promptTokens: res.inputTokens, completionTokens: res.outputTokens, costUsd: res.costUsd, latencyMs: now() - t0, httpStatus: 200 });
     return c.json({
       id: chatId(),
       object: "chat.completion",
@@ -128,6 +150,8 @@ app.post("/v1/chat/completions", async (c) => {
   } catch (err) {
     const [status, type, detail] = classify(err);
     failReq(requestId, model, t0, status, type, detail);
+    putRecord({ id: requestId, ts: t0, model, stream: false, messages: body.messages, response: detail,
+      promptTokens: 0, completionTokens: 0, costUsd: 0, latencyMs: now() - t0, httpStatus: status, errorType: type });
     return c.json(errBody(detail, type), status as 400 | 429 | 502 | 503 | 504);
   }
 });
@@ -143,6 +167,12 @@ app.use("/control/*", async (c, next) => {
 
 app.get("/control/status", async (c) =>
   c.json({ running: true, loggedIn: await cliAlive(), queueDepth: queueDepth(), ...getConfig() }));
+
+// Full request/response for the dashboard inspector (ngrok-style row expand).
+app.get("/control/requests/:id", (c) => {
+  const r = records.get(c.req.param("id"));
+  return r ? c.json(r) : c.json(errBody("no record for that id", "not_found"), 404);
+});
 
 app.post("/control/config", async (c) => {
   const b = (await c.req.json().catch(() => ({}))) as {
@@ -210,5 +240,11 @@ if (process.argv.includes("--version")) {
 }
 
 const port = getConfig().port;
-console.log(`[LocalRouter] core on 127.0.0.1:${port}`);
-export default { port, hostname: "127.0.0.1", fetch: app.fetch }; // localhost-only (ADR-0003)
+// localhost-only (ADR-0003) but dual-stack: bind IPv4 127.0.0.1 AND IPv6 ::1 so clients that
+// resolve `localhost` to ::1 (macOS default) can still reach us. Fixes "unreachable" for
+// litellm/httpx clients like Cognee.
+Bun.serve({ port, hostname: "127.0.0.1", fetch: app.fetch });
+try {
+  Bun.serve({ port, hostname: "::1", fetch: app.fetch });
+} catch { /* IPv6 unavailable — IPv4 still serves */ }
+console.log(`[LocalRouter] core on localhost:${port} (127.0.0.1 + ::1)`);

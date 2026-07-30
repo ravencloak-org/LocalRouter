@@ -4,7 +4,7 @@
 // Badge/pill class strings are written as literals so Tailwind's scanner includes them.
 import { RippleArray } from "ripple";
 import type { LrEvent } from "../../shared/events";
-import { getStatus, setConfig, login, type Model, type Effort } from "./control";
+import { getStatus, setConfig, login, getRequest, type Model, type Effort } from "./control";
 
 function summary(ev: LrEvent): string {
   if (ev.kind === "request")
@@ -90,6 +90,35 @@ export function App() {
     refresh();
   };
 
+  // ngrok-style inspector: click a request row -> full req/resp in a side drawer.
+  // Imperative DOM (reactive @-writes don't work in nested async on this Ripple).
+  const openDetail = async (id: string) => {
+    const drawer = document.getElementById("lr-drawer");
+    const meta = document.getElementById("lr-d-meta");
+    const req = document.getElementById("lr-d-req");
+    const res = document.getElementById("lr-d-res");
+    if (!drawer || !meta || !req || !res) return;
+    meta.textContent = "loading…";
+    req.textContent = "";
+    res.textContent = "";
+    drawer.style.display = "block";
+    try {
+      const r = await getRequest(id);
+      meta.textContent =
+        `${r.model} · ${r.stream ? "stream" : "non-stream"} · HTTP ${r.httpStatus} · ` +
+        `${r.promptTokens}+${r.completionTokens} tok · ${r.latencyMs}ms · $${(r.costUsd ?? 0).toFixed(4)}` +
+        (r.errorType ? ` · ${r.errorType}` : "");
+      req.textContent = JSON.stringify(r.messages, null, 2);
+      res.textContent = r.response ?? "";
+    } catch {
+      meta.textContent = "no record (evicted, or not a chat request)";
+    }
+  };
+  const closeDetail = () => {
+    const d = document.getElementById("lr-drawer");
+    if (d) d.style.display = "none";
+  };
+
   const events = new RippleArray<LrEvent>();
   const es = new EventSource("/events");
   es.onmessage = (m) => {
@@ -169,7 +198,7 @@ export function App() {
           <table class="w-full text-sm">
             <tbody>
               @for (const ev of events) {
-                <tr class="border-b border-neutral-800/50 transition hover:bg-neutral-800/40">
+                <tr class="cursor-pointer border-b border-neutral-800/50 transition hover:bg-neutral-800/40" onClick={() => { if (ev.kind === "request") openDetail(ev.requestId); }}>
                   <td class="w-24 px-4 py-1.5"><span class={badge(ev.kind)}>{ev.kind}</span></td>
                   <td class="px-4 py-1.5 font-mono text-xs text-neutral-500">{("requestId" in ev && ev.requestId) || ""}</td>
                   <td class="px-4 py-1.5 text-neutral-300">{summary(ev)}</td>
@@ -177,6 +206,22 @@ export function App() {
               }
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div id="lr-drawer" class="fixed inset-y-0 right-0 z-50 w-[42rem] max-w-full space-y-4 overflow-auto border-l border-neutral-800 bg-neutral-900 p-5 shadow-2xl" style="display:none">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-neutral-100">{"Request detail"}</h2>
+          <button onClick={() => closeDetail()} class="text-neutral-500 hover:text-neutral-200">{"✕"}</button>
+        </div>
+        <div id="lr-d-meta" class="font-mono text-xs text-neutral-400"></div>
+        <div>
+          <div class="mb-1 text-xs uppercase tracking-wide text-neutral-500">{"Request"}</div>
+          <pre id="lr-d-req" class="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-xs text-neutral-300"></pre>
+        </div>
+        <div>
+          <div class="mb-1 text-xs uppercase tracking-wide text-neutral-500">{"Response"}</div>
+          <pre id="lr-d-res" class="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-xs text-neutral-300"></pre>
         </div>
       </div>
 
