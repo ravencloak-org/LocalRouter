@@ -28,8 +28,10 @@ N=flake.nix
 # perl -pi is portable across BSD (macOS) and GNU (CI) sed differences.
 perl -pi -e "s/VERSION/$VER/g; s/SHA256_DARWIN_ARM64/$DA/; s/SHA256_DARWIN_X64/$DX/; s/SHA256_LINUX_X64/$LX/; s/SHA256_LINUX_ARM64/$LA/;" "$F"
 perl -pi -e "s/VERSION/$VER/g; s/SHA256_MACOS_ZIP/$ZIP/;" "$C"
-perl -pi -e "s/version = \"0.0.0\"/version = \"$VER\"/;" "$N"
-perl -pi -e "s{sha256-A{43}=}{$SLX}; s{sha256-B{43}=}{$SLA}; s{sha256-C{43}=}{$SDA}; s{sha256-D{43}=}{$SDX};" "$N"
+# flake.nix is committed FILLED (so `nix run github:.../LocalRouter` works), so match any
+# current version/hash by asset name — idempotent across releases, not just placeholders.
+perl -pi -e "s{version = \"[^\"]*\"}{version = \"$VER\"};" "$N"
+perl -pi -e "s{(localrouter-linux-x64\";\\s*sha256 = \")[^\"]*}{\${1}$SLX}; s{(localrouter-linux-arm64\";\\s*sha256 = \")[^\"]*}{\${1}$SLA}; s{(localrouter-darwin-arm64\";\\s*sha256 = \")[^\"]*}{\${1}$SDA}; s{(localrouter-darwin-x64\";\\s*sha256 = \")[^\"]*}{\${1}$SDX};" "$N"
 
 echo "Filled v$VER into:"
 echo "  $F  $C  $N"

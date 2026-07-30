@@ -47,7 +47,12 @@ Flake exposes the **headless core** + dashboard:
 4. [x] Swift `LocalRouter.app` (macOS menu bar) — `tray/`, `build-app.sh`.
 5. [x] Homebrew tap (cask + formula) — `packaging/homebrew/`.
 6. [x] Nix flake (core binary + NixOS module) — `flake.nix`.
-7. [ ] Go systray (win/linux) — optional, later.
+7. [x] Go systray (win/linux) — `tray-go/` (fyne.io/systray), build-verified on host.
+
+`flake.nix` is committed FILLED (real hashes) so `nix run github:ravencloak-org/LocalRouter`
+works from the repo; `release-fill.sh` re-fills it idempotently each release (matches by
+asset name, not placeholder). The Homebrew formula/cask stay as placeholder templates in the
+repo — the release attaches filled copies for the tap.
 
 ## Asset naming (canonical — CI, brew, nix all agree)
 

@@ -12,3 +12,5 @@ memory/
 
 .build/
 *.app/
+.fallow/
+tray-go/localrouter-tray
