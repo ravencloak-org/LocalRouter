@@ -2,8 +2,10 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { serveStatic } from "hono/bun";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { Database } from "bun:sqlite";
 import { bus, uid } from "./bus";
 import { runClaude, queueDepth, cliAlive, CliError, TimeoutError, type ClaudeResult } from "./claude";
 import { getConfig, setConfig, type Effort, type Config } from "./config";
@@ -45,12 +47,11 @@ function flatten(messages: any[]): { system: string; prompt: string } {
 }
 
 function finishReq(requestId: string, model: string, t0: number, res: ClaudeResult) {
-  const durationMs = now() - t0;
-  emit({ kind: "request", requestId, model, phase: "done", latencyMs: durationMs, promptTokens: res.inputTokens, completionTokens: res.outputTokens, httpStatus: 200 });
-  // ponytail: synthesized span, no OTel SDK yet. Swap for a real tracer + OTLP export later.
+  // cost now rides on the request 'done' event — no separate span row cluttering the feed.
+  // Real OTel spans (to OTLP) are a separate TODO, not a feed event.
   emit({
-    kind: "span", requestId, traceId: requestId, spanId: uid(), name: "chat.completion", durationMs,
-    attrs: { promptTokens: res.inputTokens, completionTokens: res.outputTokens, costUsd: res.costUsd, cacheReadTokens: res.cacheReadTokens, cacheCreationTokens: res.cacheCreationTokens },
+    kind: "request", requestId, model, phase: "done", latencyMs: now() - t0,
+    promptTokens: res.inputTokens, completionTokens: res.outputTokens, costUsd: res.costUsd, httpStatus: 200,
   });
 }
 function failReq(requestId: string, model: string, t0: number, httpStatus: number, errorType: string, detail: string) {
@@ -58,18 +59,39 @@ function failReq(requestId: string, model: string, t0: number, httpStatus: numbe
   emit({ kind: "log", level: "error", msg: `${errorType}: ${detail.slice(0, 200)}`, requestId });
 }
 
-// Full request/response capture for the dashboard inspector (ngrok-style). Bounded map.
+// Full request/response capture for the dashboard inspector (ngrok-style), persisted to
+// SQLite so history survives restarts. Bounded to the most recent RECORDS_CAP rows.
 type ReqRecord = {
   id: string; ts: number; model: string; stream: boolean;
   messages: unknown; response: string;
   promptTokens: number; completionTokens: number; costUsd: number;
   latencyMs: number; httpStatus: number; errorType?: string;
 };
-const records = new Map<string, ReqRecord>();
-const RECORDS_CAP = 200;
+const DB_DIR = process.env.LR_CONFIG_DIR ?? join(homedir(), ".config", "localrouter");
+mkdirSync(DB_DIR, { recursive: true });
+const db = new Database(join(DB_DIR, "requests.db"));
+db.run(
+  `CREATE TABLE IF NOT EXISTS requests (
+     id TEXT PRIMARY KEY, ts INTEGER, model TEXT, stream INTEGER, messages TEXT, response TEXT,
+     promptTokens INTEGER, completionTokens INTEGER, costUsd REAL, latencyMs INTEGER,
+     httpStatus INTEGER, errorType TEXT)`,
+);
+const _insert = db.prepare(
+  `INSERT OR REPLACE INTO requests
+     (id,ts,model,stream,messages,response,promptTokens,completionTokens,costUsd,latencyMs,httpStatus,errorType)
+   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+);
+const _get = db.prepare(`SELECT * FROM requests WHERE id = ?`);
+const RECORDS_CAP = 2000;
 function putRecord(r: ReqRecord) {
-  records.set(r.id, r);
-  if (records.size > RECORDS_CAP) records.delete(records.keys().next().value as string);
+  _insert.run(r.id, r.ts, r.model, r.stream ? 1 : 0, JSON.stringify(r.messages), r.response,
+    r.promptTokens, r.completionTokens, r.costUsd, r.latencyMs, r.httpStatus, r.errorType ?? null);
+  db.run(`DELETE FROM requests WHERE id NOT IN (SELECT id FROM requests ORDER BY ts DESC LIMIT ?)`, [RECORDS_CAP]);
+}
+function getRecord(id: string): ReqRecord | undefined {
+  const row = _get.get(id) as any;
+  if (!row) return undefined;
+  return { ...row, stream: !!row.stream, messages: JSON.parse(row.messages), errorType: row.errorType ?? undefined };
 }
 
 app.get("/healthz", async (c) => {
@@ -170,7 +192,7 @@ app.get("/control/status", async (c) =>
 
 // Full request/response for the dashboard inspector (ngrok-style row expand).
 app.get("/control/requests/:id", (c) => {
-  const r = records.get(c.req.param("id"));
+  const r = getRecord(c.req.param("id"));
   return r ? c.json(r) : c.json(errBody("no record for that id", "not_found"), 404);
 });
 

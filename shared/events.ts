@@ -15,6 +15,7 @@ export type LrEvent =
       latencyMs?: number;
       promptTokens?: number;
       completionTokens?: number;
+      costUsd?: number;
       httpStatus?: number;
       errorType?: string;
       preview?: string;

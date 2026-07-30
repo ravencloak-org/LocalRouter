@@ -34,7 +34,7 @@ function tokCount(evs: RippleArray<LrEvent>): number {
 }
 function costSum(evs: RippleArray<LrEvent>): string {
   let c = 0;
-  for (const e of evs) if (e.kind === "span") c += (e.attrs?.costUsd as number) ?? 0;
+  for (const e of evs) if (e.kind === "request" && e.phase === "done" && e.costUsd) c += e.costUsd;
   return "$" + c.toFixed(4);
 }
 
