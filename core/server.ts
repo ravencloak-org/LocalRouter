@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { serveStatic } from "hono/bun";
 import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { bus, uid } from "./bus";
 import { runClaude, queueDepth, cliAlive, CliError, TimeoutError, type ClaudeResult } from "./claude";
 import { getConfig, setConfig, type Effort, type Config } from "./config";
@@ -179,11 +180,17 @@ app.get("/events", (c) =>
   }));
 
 // --- Static dashboard. Registered LAST so /v1/*, /control/*, /events, /healthz win. ---
-// ponytail: root is relative to cwd. Ship the binary next to ./web/dist (scripts/build.sh).
-const distRoot = "./web/dist";
-if (existsSync(`${distRoot}/index.html`)) {
+// Resolve the built dashboard cwd-INDEPENDENTLY so `/` never 404s from a stray cwd:
+// dev (cwd/web/dist), the .app bundle (<exe>/../Resources/web/dist), or binary-adjacent.
+const exeDir = dirname(process.execPath);
+const distRoot = [
+  join(process.cwd(), "web", "dist"),
+  join(exeDir, "..", "Resources", "web", "dist"),
+  join(exeDir, "web", "dist"),
+].find((d) => existsSync(join(d, "index.html")));
+if (distRoot) {
   app.use("/*", serveStatic({ root: distRoot }));
-  app.get("/*", serveStatic({ path: `${distRoot}/index.html` })); // SPA fallback
+  app.get("/*", serveStatic({ path: join(distRoot, "index.html") })); // SPA fallback
 } else {
   app.get("/*", (c) =>
     c.html("<!doctype html><title>LocalRouter</title><body style=font-family:system-ui;padding:2rem><h1>LocalRouter</h1><p>dashboard not built — run <code>scripts/build.sh</code></p>", 200));
