@@ -33,13 +33,15 @@ func trayIcon() []byte {
 }
 
 var (
-	base      = envOr("LR_BASE", "http://127.0.0.1:8083")
-	dashboard = envOr("LR_DASHBOARD", "http://127.0.0.1:5173")
+	base = envOr("LR_BASE", "http://127.0.0.1:8083")
+	// the core SERVES the dashboard, so open the core URL — not the Vite dev port (5173)
+	dashboard = envOr("LR_DASHBOARD", base)
 	models    = []string{"sonnet", "opus", "haiku"}
 	efforts   = []string{"low", "medium", "high"}
 
 	mStatus     *systray.MenuItem
 	mURL        *systray.MenuItem
+	mErr        *systray.MenuItem
 	mStart      *systray.MenuItem
 	mStop       *systray.MenuItem
 	modelItems  []*systray.MenuItem
@@ -88,6 +90,10 @@ func startCore() {
 		return // already running
 	}
 	coreProc = spawnCore()
+	if coreProc == nil && mErr != nil {
+		mErr.SetTitle("⚠ start failed — no bundled core / LR_REPO")
+		mErr.Show()
+	}
 }
 
 func envOr(k, d string) string {
@@ -166,24 +172,28 @@ func openURL(u string) {
 
 func updateUI(s *status) {
 	running := s != nil
+	// show only the relevant lifecycle action
 	if mStart != nil {
 		if running {
-			mStart.Disable()
+			mStart.Hide()
 		} else {
-			mStart.Enable()
+			mStart.Show()
 		}
 	}
 	if mStop != nil {
 		if running {
-			mStop.Enable()
+			mStop.Show()
 		} else {
-			mStop.Disable()
+			mStop.Hide()
 		}
+	}
+	if running && mErr != nil {
+		mErr.Hide() // clear stale error once the core is up
 	}
 	if s == nil {
 		mStatus.SetTitle("○ core not reachable")
 		if mURL != nil {
-			mURL.SetTitle("URL: —")
+			mURL.SetTitle("Anthropic: —")
 		}
 		return
 	}
@@ -201,7 +211,7 @@ func updateUI(s *status) {
 		url = *s.AnthropicBaseURL
 	}
 	if mURL != nil {
-		mURL.SetTitle("URL: " + url)
+		mURL.SetTitle("Anthropic: " + url)
 	}
 	// main icon = logo only; state lives in the menu (no glyph on the title)
 	for i, it := range modelItems {
@@ -227,8 +237,11 @@ func onReady() {
 
 	mStatus = systray.AddMenuItem("…", "")
 	mStatus.Disable()
-	mURL = systray.AddMenuItem("URL: …", "")
+	mURL = systray.AddMenuItem("Anthropic: …", "")
 	mURL.Disable()
+	mErr = systray.AddMenuItem("", "")
+	mErr.Disable()
+	mErr.Hide()
 	systray.AddSeparator()
 
 	mLogin := systray.AddMenuItem("Login (claude)…", "opens a terminal running claude login")

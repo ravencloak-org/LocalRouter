@@ -5,7 +5,8 @@ import Foundation
 
 let PORT = ProcessInfo.processInfo.environment["LR_PORT"].flatMap { Int($0) } ?? 8083
 let BASE = "http://127.0.0.1:\(PORT)"
-let DASHBOARD = ProcessInfo.processInfo.environment["LR_DASHBOARD"] ?? "http://127.0.0.1:5173"
+// the core SERVES the dashboard, so it's the core URL — not the Vite dev port (5173)
+let DASHBOARD = ProcessInfo.processInfo.environment["LR_DASHBOARD"] ?? BASE
 let MODELS = ["sonnet", "opus", "haiku"]
 let EFFORTS = ["low", "medium", "high"]
 
@@ -67,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var last: Status?
     var timer: Timer?
     var coreProc: Process? // core spawned by the tray (Start), so Stop can restart it
+    var lastError: String? // last Start failure, shown in the menu
 
     func applicationDidFinishLaunching(_ n: Notification) {
         NSApp.setActivationPolicy(.accessory) // menu-bar only, no Dock icon
@@ -82,7 +84,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func refresh() {
-        Control.status { s in DispatchQueue.main.async { self.last = s; self.rebuild() } }
+        Control.status { s in
+            DispatchQueue.main.async {
+                self.last = s
+                if s != nil { self.lastError = nil } // running -> clear stale error
+                self.rebuild()
+            }
+        }
     }
     func refreshSoon() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.refresh() }
@@ -113,9 +121,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         m.addItem(head)
         if let s {
             let url = s.anthropicBaseUrl ?? "default (api.anthropic.com)"
-            let urlItem = NSMenuItem(title: "URL: \(url)", action: nil, keyEquivalent: "")
+            let urlItem = NSMenuItem(title: "Anthropic: \(url)", action: nil, keyEquivalent: "")
             urlItem.isEnabled = false
             m.addItem(urlItem)
+        }
+        if let err = lastError {
+            let e = NSMenuItem(title: "⚠ \(err)", action: nil, keyEquivalent: "")
+            e.isEnabled = false
+            m.addItem(e)
         }
         m.addItem(.separator())
 
@@ -144,11 +157,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         m.addItem(effortItem)
 
         m.addItem(.separator())
-        let running = s != nil
-        let start = mk("Start Core", #selector(startCore)); start.isEnabled = !running
-        m.addItem(start)
-        let stop = mk("Stop Core", #selector(stopCore)); stop.isEnabled = running
-        m.addItem(stop)
+        // show only the relevant lifecycle action for the current state
+        if s == nil {
+            m.addItem(mk("Start Core", #selector(startCore)))
+        } else {
+            m.addItem(mk("Stop Core", #selector(stopCore)))
+        }
         m.addItem(mk("Open Dashboard", #selector(openDashboard)))
         m.addItem(.separator())
         m.addItem(NSMenuItem(title: "Quit Tray", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -168,16 +182,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func startCore() {
         if last != nil { return } // already running per last poll
+        lastError = nil
         coreProc = spawnCore()
+        rebuild() // reflect any error immediately
         refreshSoon()
-    }
-
-    func alert(_ title: String, _ info: String) {
-        NSApp.activate(ignoringOtherApps: true)
-        let a = NSAlert()
-        a.messageText = title
-        a.informativeText = info
-        a.runModal()
     }
     @objc func stopCore() {
         Control.shutdown() // graceful; core exits, next poll shows stopped
@@ -206,12 +214,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             p.arguments = ["-lc", "bun \(repo)/core/server.ts"]
             p.currentDirectoryURL = URL(fileURLWithPath: repo)
         } else {
-            alert("Can't start the core",
-                  "No bundled core and no LR_REPO/LR_CORE set. Either open the packaged LocalRouter.app (run tray/build-app.sh) or launch the tray with LR_REPO=/path/to/LocalRouter.")
+            lastError = "no bundled core / LR_REPO — rebuild via tray/build-app.sh"
             return nil
         }
         do { try p.run(); return p } catch {
-            alert("Start failed", "\(error)")
+            lastError = "start failed: \(error.localizedDescription)"
             return nil
         }
     }
