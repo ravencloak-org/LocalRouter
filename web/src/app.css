@@ -1,0 +1,4 @@
+@import "tailwindcss";
+
+/* Ripple compiles .ripple files; make sure Tailwind scans them for used classes. */
+@source "./**/*.ripple";

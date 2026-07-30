@@ -1,10 +1,11 @@
 import { defineConfig } from "vite";
 import { ripple } from "vite-plugin-ripple";
+import tailwindcss from "@tailwindcss/vite";
 
 // ponytail: verify the plugin's exact package name/export against ripple-ts.com — Ripple
 // is alpha and this may be `@ripple/vite-plugin` or similar in your pinned version.
 export default defineConfig({
-  plugins: [ripple()],
+  plugins: [ripple(), tailwindcss()],
   server: {
     port: 5173,
     fs: { allow: [".."] }, // let src import ../shared/events (type-only)

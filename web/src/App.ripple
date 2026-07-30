@@ -1,8 +1,7 @@
-// LocalRouter Dashboard — control bar + live Event feed.
-// ponytail: Ripple 0.3.x (TSRX) — a component is a `function` whose body contains JSX (no
-// `component` keyword). Reactive `@x = v` writes only work at component-body top level, NOT
-// in nested async fns, so the single status line is updated imperatively (plain DOM). The
-// event feed uses the proven RippleArray + @for reactive path.
+// LocalRouter Dashboard (Tailwind). Ripple 0.3.x: component = `function` returning a single
+// JSX root; reactive `@x = v` writes don't work in nested async, so the header pills + inputs
+// are updated imperatively (plain DOM). The event feed uses reactive RippleArray + @for.
+// Badge/pill class strings are written as literals so Tailwind's scanner includes them.
 import { RippleArray } from "ripple";
 import type { LrEvent } from "../../shared/events";
 import { getStatus, setConfig, login, type Model, type Effort } from "./control";
@@ -15,31 +14,60 @@ function summary(ev: LrEvent): string {
   return ev.delta; // token
 }
 
+function badge(kind: string): string {
+  const base = "inline-block px-2 py-0.5 rounded-md text-xs font-medium ";
+  if (kind === "request") return base + "bg-sky-500/15 text-sky-300";
+  if (kind === "log") return base + "bg-red-500/15 text-red-300";
+  if (kind === "span") return base + "bg-emerald-500/15 text-emerald-300";
+  return base + "bg-neutral-700/40 text-neutral-400"; // token
+}
+
+function reqCount(evs: RippleArray<LrEvent>): number {
+  let n = 0;
+  for (const e of evs) if (e.kind === "request" && e.phase === "done") n++;
+  return n;
+}
+function tokCount(evs: RippleArray<LrEvent>): number {
+  let n = 0;
+  for (const e of evs) if (e.kind === "request" && e.completionTokens) n += e.completionTokens;
+  return n;
+}
+function costSum(evs: RippleArray<LrEvent>): string {
+  let c = 0;
+  for (const e of evs) if (e.kind === "span") c += (e.attrs?.costUsd as number) ?? 0;
+  return "$" + c.toFixed(4);
+}
+
 export function App() {
-  // --- control: status line updated imperatively (see header note) ---
   async function refresh() {
     let s = null;
     try {
       s = await getStatus();
     } catch {
-      s = null; // core unreachable
+      s = null;
     }
-    const el = document.getElementById("lr-status");
-    if (!el) return;
-    el.textContent = s
-      ? `● :${s.port} · ${s.model} · effort:${s.effort ?? "—"} · ${s.loggedIn ? "logged in" : "LOGGED OUT"}${s.anthropicBaseUrl ? " · " + s.anthropicBaseUrl : ""}`
-      : "○ core not reachable";
-    el.className = s && !s.loggedIn ? "stat off" : "stat";
-    // reflect current values into inputs (only when the user isn't editing them)
+    const run = document.getElementById("lr-run");
+    if (run) {
+      run.textContent = s ? "● running · :" + s.port : "○ core not reachable";
+      run.style.color = s ? "#34d399" : "#737373";
+    }
+    const lg = document.getElementById("lr-login");
+    if (lg) {
+      lg.textContent = s ? (s.loggedIn ? "logged in" : "logged out") : "—";
+      lg.style.color = s ? (s.loggedIn ? "#34d399" : "#f87171") : "#737373";
+    }
     if (s) {
-      const p = document.getElementById("lr-port") as HTMLInputElement | null;
-      if (p && document.activeElement !== p) p.value = String(s.port);
-      const u = document.getElementById("lr-baseurl") as HTMLInputElement | null;
-      if (u && document.activeElement !== u) u.value = s.anthropicBaseUrl ?? "";
+      setVal("lr-model", s.model);
+      setVal("lr-effort", s.effort ?? "");
+      setVal("lr-port", String(s.port));
+      setVal("lr-baseurl", s.anthropicBaseUrl ?? "");
     }
   }
+  function setVal(id: string, v: string) {
+    const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
+    if (el && document.activeElement !== el) el.value = v;
+  }
   refresh();
-  // ponytail: interval never cleared — the dashboard is one long-lived page, so fine.
   setInterval(refresh, 5000);
 
   const onModel = async (e: Event) => {
@@ -54,7 +82,7 @@ export function App() {
     const v = Number((e.target as HTMLInputElement).value);
     if (v > 0 && v < 65536) {
       await setConfig({ port: v });
-      refresh(); // note: applies on core restart
+      refresh();
     }
   };
   const onBaseUrl = async (e: Event) => {
@@ -62,7 +90,6 @@ export function App() {
     refresh();
   };
 
-  // --- event feed (reactive) ---
   const events = new RippleArray<LrEvent>();
   const es = new EventSource("/events");
   es.onmessage = (m) => {
@@ -70,57 +97,89 @@ export function App() {
     if (events.length > 500) events.shift();
   };
 
-  return <div class="app">
-    <h1>{"LocalRouter"}</h1>
+  return <div class="min-h-screen bg-neutral-950 text-neutral-300 antialiased">
+    <div class="mx-auto max-w-6xl p-6 space-y-6">
 
-    <div class="controls">
-      <span id="lr-status" class="stat">{"…"}</span>
-      <button onClick={() => login()}>{"Login"}</button>
-      <select onChange={onModel}>
-        <option value="sonnet">{"sonnet"}</option>
-        <option value="opus">{"opus"}</option>
-        <option value="haiku">{"haiku"}</option>
-      </select>
-      <select onChange={onEffort}>
-        <option value="low">{"low"}</option>
-        <option value="medium">{"medium"}</option>
-        <option value="high">{"high"}</option>
-      </select>
-      <label class="fld">{"port"}<input id="lr-port" type="number" min="1" max="65535" onChange={onPort} title="applies on core restart" /></label>
-      <label class="fld">{"anthropic url"}<input id="lr-baseurl" type="text" placeholder="default" onChange={onBaseUrl} title="ANTHROPIC_BASE_URL for the CLI; blank = default" /></label>
-      <span class="hint">{"start/stop from the tray"}</span>
+      <header class="flex items-center gap-3">
+        <img src="/favicon.png" class="h-9 w-9" alt="" />
+        <div>
+          <h1 class="text-lg font-semibold text-neutral-100 leading-none">{"LocalRouter"}</h1>
+          <p class="mt-1 text-xs text-neutral-500">{"Claude subscription → OpenAI-compatible API"}</p>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+          <span id="lr-run" class="rounded-full border border-neutral-700 bg-neutral-900 px-3 py-1 text-xs font-medium">{"…"}</span>
+          <span id="lr-login" class="rounded-full border border-neutral-700 bg-neutral-900 px-3 py-1 text-xs font-medium">{"…"}</span>
+        </div>
+      </header>
+
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div class="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+          <div class="text-xs uppercase tracking-wide text-neutral-500">{"Requests"}</div>
+          <div class="mt-1 text-2xl font-semibold tabular-nums text-neutral-100">{reqCount(events)}</div>
+        </div>
+        <div class="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+          <div class="text-xs uppercase tracking-wide text-neutral-500">{"Output tokens"}</div>
+          <div class="mt-1 text-2xl font-semibold tabular-nums text-neutral-100">{tokCount(events)}</div>
+        </div>
+        <div class="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+          <div class="text-xs uppercase tracking-wide text-neutral-500">{"Cost"}</div>
+          <div class="mt-1 text-2xl font-semibold tabular-nums text-emerald-400">{costSum(events)}</div>
+        </div>
+        <div class="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+          <div class="text-xs uppercase tracking-wide text-neutral-500">{"Events"}</div>
+          <div class="mt-1 text-2xl font-semibold tabular-nums text-neutral-100">{events.length}</div>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+        <div class="flex flex-wrap items-end gap-4">
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-neutral-500">{"Model"}</span>
+            <select id="lr-model" onChange={onModel} class="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 outline-none focus:border-neutral-500">
+              <option value="sonnet">{"sonnet"}</option>
+              <option value="opus">{"opus"}</option>
+              <option value="haiku">{"haiku"}</option>
+            </select>
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-neutral-500">{"Effort"}</span>
+            <select id="lr-effort" onChange={onEffort} class="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 outline-none focus:border-neutral-500">
+              <option value="">{"default"}</option>
+              <option value="low">{"low"}</option>
+              <option value="medium">{"medium"}</option>
+              <option value="high">{"high"}</option>
+            </select>
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs text-neutral-500">{"Port"}<span class="text-neutral-600">{" (restart)"}</span></span>
+            <input id="lr-port" type="number" min="1" max="65535" onChange={onPort} class="w-24 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 outline-none focus:border-neutral-500" />
+          </label>
+          <label class="flex flex-1 flex-col gap-1">
+            <span class="text-xs text-neutral-500">{"Anthropic base URL"}</span>
+            <input id="lr-baseurl" type="text" placeholder="default" onChange={onBaseUrl} class="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 outline-none focus:border-neutral-500" />
+          </label>
+          <button onClick={() => login()} class="rounded-lg bg-neutral-100 px-4 py-1.5 text-sm font-medium text-neutral-900 transition hover:bg-white">{"Login"}</button>
+        </div>
+        <p class="mt-3 text-xs text-neutral-600">{"Start / Stop the core from the menu-bar tray. Port applies on restart; env vars win over these fields."}</p>
+      </div>
+
+      <div class="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900">
+        <div class="border-b border-neutral-800 px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-neutral-500">{"Live requests"}</div>
+        <div class="max-h-[26rem] overflow-auto">
+          <table class="w-full text-sm">
+            <tbody>
+              @for (const ev of events) {
+                <tr class="border-b border-neutral-800/50 transition hover:bg-neutral-800/40">
+                  <td class="w-24 px-4 py-1.5"><span class={badge(ev.kind)}>{ev.kind}</span></td>
+                  <td class="px-4 py-1.5 font-mono text-xs text-neutral-500">{("requestId" in ev && ev.requestId) || ""}</td>
+                  <td class="px-4 py-1.5 text-neutral-300">{summary(ev)}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
-
-    <table>
-      <tbody>
-        @for (const ev of events) {
-          <tr class={ev.kind}>
-            <td>{ev.kind}</td>
-            <td>{("requestId" in ev && ev.requestId) || ""}</td>
-            <td>{summary(ev)}</td>
-          </tr>
-        }
-      </tbody>
-    </table>
-
-    <style>
-    .app { font-family: ui-monospace, SFMono-Regular, monospace; padding: 1rem; color: #ddd; background: #111; min-height: 100vh; }
-    h1 { font-size: 1rem; opacity: .6; }
-    .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #262626; font-size: 12px; }
-    .stat { color: #aaa; }
-    .stat.off { color: #e66; font-weight: bold; }
-    .hint { color: #666; font-style: italic; }
-    .controls button, .controls select, .controls input { font: inherit; font-size: 12px; background: #1a1a1a; color: #ddd; border: 1px solid #333; border-radius: 4px; padding: 3px 8px; }
-    .controls button, .controls select { cursor: pointer; }
-    .controls button:hover, .controls select:hover, .controls input:focus { border-color: #555; }
-    .controls .fld { display: flex; gap: 4px; align-items: center; }
-    .controls #lr-port { width: 64px; }
-    .controls #lr-baseurl { width: 200px; }
-    td { padding: 2px 10px; border-bottom: 1px solid #262626; font-size: 12px; }
-    tr.request td:first-child { color: #6ad; }
-    tr.log td:first-child { color: #e66; }
-    tr.span td:first-child { color: #8c8; }
-    tr.token td:first-child { color: #999; }
-  </style>
   </div>
 }

@@ -10,6 +10,8 @@
     "ripple": "latest"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "tailwindcss": "^4.3.3",
     "vite": "^6",
     "vite-plugin-ripple": "latest"
   }
