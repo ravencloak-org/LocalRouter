@@ -5,7 +5,7 @@
 // event feed uses the proven RippleArray + @for reactive path.
 import { RippleArray } from "ripple";
 import type { LrEvent } from "../../shared/events";
-import { getStatus, setConfig, login, shutdown, type Model, type Effort } from "./control";
+import { getStatus, setConfig, login, type Model, type Effort } from "./control";
 
 function summary(ev: LrEvent): string {
   if (ev.kind === "request")
@@ -88,7 +88,7 @@ export function App() {
       </select>
       <label class="fld">{"port"}<input id="lr-port" type="number" min="1" max="65535" onChange={onPort} title="applies on core restart" /></label>
       <label class="fld">{"anthropic url"}<input id="lr-baseurl" type="text" placeholder="default" onChange={onBaseUrl} title="ANTHROPIC_BASE_URL for the CLI; blank = default" /></label>
-      <button onClick={() => shutdown()}>{"Stop"}</button>
+      <span class="hint">{"start/stop from the tray"}</span>
     </div>
 
     <table>
@@ -109,6 +109,7 @@ export function App() {
     .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #262626; font-size: 12px; }
     .stat { color: #aaa; }
     .stat.off { color: #e66; font-weight: bold; }
+    .hint { color: #666; font-style: italic; }
     .controls button, .controls select, .controls input { font: inherit; font-size: 12px; background: #1a1a1a; color: #ddd; border: 1px solid #333; border-radius: 4px; padding: 3px 8px; }
     .controls button, .controls select { cursor: pointer; }
     .controls button:hover, .controls select:hover, .controls input:focus { border-color: #555; }

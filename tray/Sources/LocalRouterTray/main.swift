@@ -65,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     var last: Status?
     var timer: Timer?
+    var coreProc: Process? // core spawned by the tray (Start), so Stop can restart it
 
     func applicationDidFinishLaunching(_ n: Notification) {
         NSApp.setActivationPolicy(.accessory) // menu-bar only, no Dock icon
@@ -137,8 +138,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         m.addItem(effortItem)
 
         m.addItem(.separator())
+        let running = s != nil
+        let start = mk("Start Core", #selector(startCore)); start.isEnabled = !running
+        m.addItem(start)
+        let stop = mk("Stop Core", #selector(stopCore)); stop.isEnabled = running
+        m.addItem(stop)
         m.addItem(mk("Open Dashboard", #selector(openDashboard)))
-        m.addItem(mk("Stop Core", #selector(stopCore)))
         m.addItem(.separator())
         m.addItem(NSMenuItem(title: "Quit Tray", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = m
@@ -154,7 +159,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func pickModel(_ i: NSMenuItem) { Control.setConfig(model: i.representedObject as? String); refreshSoon() }
     @objc func pickEffort(_ i: NSMenuItem) { Control.setConfig(effort: i.representedObject as? String); refreshSoon() }
     @objc func openDashboard() { if let u = URL(string: DASHBOARD) { NSWorkspace.shared.open(u) } }
-    @objc func stopCore() { Control.shutdown(); refreshSoon() }
+
+    @objc func startCore() {
+        if last != nil { return } // already running per last poll
+        coreProc = spawnCore()
+        refreshSoon()
+    }
+    @objc func stopCore() {
+        Control.shutdown() // graceful; core exits, next poll shows stopped
+        coreProc = nil
+        refreshSoon()
+    }
+
+    // Launch the core. Resolution order: $LR_CORE ("cmd arg arg") -> bundled localrouter-core
+    // (with the bundled dashboard as cwd) -> dev fallback `bun $LR_REPO/core/server.ts`.
+    func spawnCore() -> Process? {
+        let env = ProcessInfo.processInfo.environment
+        let p = Process()
+        if let c = env["LR_CORE"], !c.isEmpty {
+            let parts = c.split(separator: " ").map(String.init)
+            p.executableURL = URL(fileURLWithPath: parts[0])
+            p.arguments = Array(parts.dropFirst())
+        } else if let exeDir = Bundle.main.executableURL?.deletingLastPathComponent(),
+                  FileManager.default.isExecutableFile(atPath: exeDir.appendingPathComponent("localrouter-core").path) {
+            p.executableURL = exeDir.appendingPathComponent("localrouter-core")
+            // bundled dashboard lives in ../Resources/web/dist (build-app.sh); serve it via cwd
+            p.currentDirectoryURL = exeDir.deletingLastPathComponent().appendingPathComponent("Resources")
+        } else {
+            let repo = env["LR_REPO"] ?? FileManager.default.currentDirectoryPath
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            p.arguments = ["bun", "\(repo)/core/server.ts"]
+            p.currentDirectoryURL = URL(fileURLWithPath: repo)
+        }
+        do { try p.run(); return p } catch { return nil }
+    }
 }
 
 let app = NSApplication.shared

@@ -11,7 +11,9 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"fyne.io/systray"
@@ -38,9 +40,45 @@ var (
 	efforts   = []string{"low", "medium", "high"}
 
 	mStatus     *systray.MenuItem
+	mStart      *systray.MenuItem
+	mStop       *systray.MenuItem
 	modelItems  []*systray.MenuItem
 	effortItems []*systray.MenuItem
+	coreProc    *exec.Cmd // core spawned by the tray (Start), so Stop can restart it
 )
+
+// spawnCore launches the core: $LR_CORE ("cmd arg..") -> bundled localrouter-core (cwd = its
+// dir, which holds ./web/dist) -> dev fallback `bun $LR_REPO/core/server.ts`.
+func spawnCore() *exec.Cmd {
+	var cmd *exec.Cmd
+	if c := os.Getenv("LR_CORE"); c != "" {
+		p := strings.Fields(c)
+		cmd = exec.Command(p[0], p[1:]...)
+	} else if exe, err := os.Executable(); err == nil {
+		dir := filepath.Dir(exe)
+		core := filepath.Join(dir, "localrouter-core")
+		if _, e := os.Stat(core); e == nil {
+			cmd = exec.Command(core)
+			cmd.Dir = dir
+		}
+	}
+	if cmd == nil { // dev fallback
+		repo := envOr("LR_REPO", ".")
+		cmd = exec.Command("bun", filepath.Join(repo, "core", "server.ts"))
+		cmd.Dir = repo
+	}
+	if cmd.Start() != nil {
+		return nil
+	}
+	return cmd
+}
+
+func startCore() {
+	if getStatus() != nil {
+		return // already running
+	}
+	coreProc = spawnCore()
+}
 
 func envOr(k, d string) string {
 	if v := os.Getenv(k); v != "" {
@@ -115,6 +153,21 @@ func openURL(u string) {
 }
 
 func updateUI(s *status) {
+	running := s != nil
+	if mStart != nil {
+		if running {
+			mStart.Disable()
+		} else {
+			mStart.Enable()
+		}
+	}
+	if mStop != nil {
+		if running {
+			mStop.Enable()
+		} else {
+			mStop.Disable()
+		}
+	}
 	if s == nil {
 		mStatus.SetTitle("○ core not reachable")
 		systray.SetTitle("LR ○")
@@ -178,8 +231,9 @@ func onReady() {
 		}(name, it)
 	}
 	systray.AddSeparator()
+	mStart = systray.AddMenuItem("Start Core", "")
+	mStop = systray.AddMenuItem("Stop Core", "")
 	mDash := systray.AddMenuItem("Open Dashboard", "")
-	mStop := systray.AddMenuItem("Stop Core", "")
 	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Quit Tray", "")
 
@@ -195,8 +249,13 @@ func onReady() {
 				login()
 			case <-mDash.ClickedCh:
 				openURL(dashboard)
+			case <-mStart.ClickedCh:
+				startCore()
+				time.Sleep(600 * time.Millisecond)
+				updateUI(getStatus())
 			case <-mStop.ClickedCh:
 				shutdown()
+				coreProc = nil
 				time.Sleep(400 * time.Millisecond)
 				updateUI(getStatus())
 			case <-mQuit.ClickedCh:

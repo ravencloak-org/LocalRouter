@@ -23,8 +23,12 @@ open LocalRouter.app
 - **Login (claude)…** — opens Terminal.app running `claude login` (interactive OAuth)
 - **Model** — sonnet / opus / haiku → `POST /control/config`
 - **Effort** — low / medium / high → `POST /control/config`
+- **Start Core** — spawns the core (`$LR_CORE`, else bundled `localrouter-core`, else `bun $LR_REPO/core/server.ts`)
+- **Stop Core** — `POST /control/shutdown` (Start again to restart, e.g. to apply a new port)
 - **Open Dashboard** — opens `LR_DASHBOARD`
-- **Stop Core** — `POST /control/shutdown`
+
+`build-app.sh` bundles the core binary + built dashboard into the `.app`, so **Start Core**
+works standalone (no dev checkout needed).
 
 ## Env
 
