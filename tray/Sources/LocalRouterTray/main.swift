@@ -50,7 +50,7 @@ enum Control {
         osascript("""
         tell application "Terminal"
             activate
-            do script "claude login"
+            do script "claude setup-token"
         end tell
         """)
     }

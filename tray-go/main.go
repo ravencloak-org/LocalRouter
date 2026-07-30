@@ -151,11 +151,13 @@ func shutdown()                         { req("POST", "/control/shutdown", nil) 
 func login() {
 	switch runtime.GOOS {
 	case "windows":
-		exec.Command("cmd", "/c", "start", "claude", "login").Start()
+		exec.Command("cmd", "/c", "start", "cmd", "/k", "claude setup-token").Start()
 	case "darwin":
-		exec.Command("osascript", "-e", `tell application "Terminal" to do script "claude login"`).Start()
+		exec.Command("osascript",
+			"-e", `tell application "Terminal" to do script "claude setup-token"`,
+			"-e", `tell application "Terminal" to activate`).Start()
 	default: // linux/bsd
-		exec.Command("x-terminal-emulator", "-e", "claude", "login").Start()
+		exec.Command("x-terminal-emulator", "-e", "sh", "-lc", "claude setup-token").Start()
 	}
 }
 

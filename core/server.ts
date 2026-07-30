@@ -160,9 +160,16 @@ app.post("/control/config", async (c) => {
 });
 
 app.post("/control/login", (c) => {
-  // Interactive OAuth: opens a browser. Needs a TTY on headless hosts (see ADR-0003);
-  // the macOS tray runs this in Terminal.app instead.
-  Bun.spawn(["claude", "login"], { stdin: "ignore", stdout: "ignore", stderr: "ignore" });
+  // Real auth = `claude setup-token` (OAuth for the subscription). NOT `claude login`
+  // (that isn't a command). It needs a TTY + browser, so open it in a terminal.
+  const cmd = "claude setup-token";
+  if (process.platform === "darwin") {
+    Bun.spawn(["osascript", "-e", `tell application "Terminal" to do script "${cmd}"`, "-e", `tell application "Terminal" to activate`]);
+  } else if (process.platform === "win32") {
+    Bun.spawn(["cmd", "/c", "start", "cmd", "/k", cmd]);
+  } else {
+    Bun.spawn(["x-terminal-emulator", "-e", "sh", "-lc", cmd]);
+  }
   return c.json({ started: true });
 });
 
