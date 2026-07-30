@@ -46,6 +46,18 @@ function flatten(messages: any[]): { system: string; prompt: string } {
   return { system, prompt };
 }
 
+// Liveness/key-validation probe: system asks to echo a literal string, user sends it
+// (e.g. Cognee's `respond with the following string: "test"`). We return the string directly
+// instead of spawning `claude` — same answer, zero quota, no feed spam.
+function healthEcho(messages: any[]): string | null {
+  if (!Array.isArray(messages) || messages.length !== 2) return null;
+  const sys = messages.find((m) => m.role === "system");
+  const usr = messages.find((m) => m.role === "user");
+  if (!sys || !usr) return null;
+  const m = /with the following string:\s*"([^"]*)"\s*$/i.exec(String(sys.content).trim());
+  return m && String(usr.content).trim() === m[1] ? m[1] : null;
+}
+
 function finishReq(requestId: string, model: string, t0: number, res: ClaudeResult) {
   // cost now rides on the request 'done' event — no separate span row cluttering the feed.
   // Real OTel spans (to OTLP) are a separate TODO, not a feed event.
@@ -108,6 +120,21 @@ app.post("/v1/embeddings", (c) =>
 app.post("/v1/chat/completions", async (c) => {
   const body = await c.req.json().catch(() => null);
   if (!body?.messages?.length) return c.json(errBody("`messages` required", "invalid_request_error"), 400);
+
+  // Echo liveness/key-validation probes without spawning claude (saves quota, no feed spam).
+  // Opt out with LR_NO_ECHO=1.
+  const echo = process.env.LR_NO_ECHO ? null : healthEcho(body.messages);
+  if (echo !== null && !body.stream) {
+    emit({ kind: "log", level: "debug", msg: `health-check echoed "${echo}" (no LLM call)` });
+    return c.json({
+      id: chatId(),
+      object: "chat.completion",
+      created: Math.floor(now() / 1000),
+      model: body.model ?? "claude",
+      choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant", content: echo } }],
+      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+    });
+  }
 
   const requestId = rid();
   const model = body.model ?? "claude";
