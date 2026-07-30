@@ -13,7 +13,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 
 	"fyne.io/systray"
@@ -40,6 +39,7 @@ var (
 	efforts   = []string{"low", "medium", "high"}
 
 	mStatus     *systray.MenuItem
+	mURL        *systray.MenuItem
 	mStart      *systray.MenuItem
 	mStop       *systray.MenuItem
 	modelItems  []*systray.MenuItem
@@ -51,20 +51,30 @@ var (
 // dir, which holds ./web/dist) -> dev fallback `bun $LR_REPO/core/server.ts`.
 func spawnCore() *exec.Cmd {
 	var cmd *exec.Cmd
-	if c := os.Getenv("LR_CORE"); c != "" {
-		p := strings.Fields(c)
-		cmd = exec.Command(p[0], p[1:]...)
-	} else if exe, err := os.Executable(); err == nil {
+	// prefer the bundled self-contained binary (absolute path, no PATH needed)
+	if exe, err := os.Executable(); err == nil {
 		dir := filepath.Dir(exe)
 		core := filepath.Join(dir, "localrouter-core")
+		if runtime.GOOS == "windows" {
+			core += ".exe"
+		}
 		if _, e := os.Stat(core); e == nil {
 			cmd = exec.Command(core)
 			cmd.Dir = dir
 		}
 	}
-	if cmd == nil { // dev fallback
+	if cmd == nil {
+		// dev fallback via a LOGIN shell so PATH (bun) resolves under a GUI launch
+		line := os.Getenv("LR_CORE")
 		repo := envOr("LR_REPO", ".")
-		cmd = exec.Command("bun", filepath.Join(repo, "core", "server.ts"))
+		if line == "" {
+			line = "bun " + filepath.Join(repo, "core", "server.ts")
+		}
+		if runtime.GOOS == "windows" {
+			cmd = exec.Command("cmd", "/c", line)
+		} else {
+			cmd = exec.Command("/bin/sh", "-lc", line)
+		}
 		cmd.Dir = repo
 	}
 	if cmd.Start() != nil {
@@ -88,10 +98,12 @@ func envOr(k, d string) string {
 }
 
 type status struct {
-	Running  bool    `json:"running"`
-	LoggedIn bool    `json:"loggedIn"`
-	Model    string  `json:"model"`
-	Effort   *string `json:"effort"`
+	Running          bool    `json:"running"`
+	LoggedIn         bool    `json:"loggedIn"`
+	Model            string  `json:"model"`
+	Effort           *string `json:"effort"`
+	Port             int     `json:"port"`
+	AnthropicBaseURL *string `json:"anthropicBaseUrl"`
 }
 
 // req sends a /control/* request with the required CSRF header.
@@ -170,7 +182,9 @@ func updateUI(s *status) {
 	}
 	if s == nil {
 		mStatus.SetTitle("○ core not reachable")
-		systray.SetTitle("LR ○")
+		if mURL != nil {
+			mURL.SetTitle("URL: —")
+		}
 		return
 	}
 	eff := "—"
@@ -178,12 +192,18 @@ func updateUI(s *status) {
 		eff = *s.Effort
 	}
 	login := "logged in"
-	glyph := "●"
 	if !s.LoggedIn {
-		login, glyph = "LOGGED OUT", "⚠"
+		login = "LOGGED OUT"
 	}
-	mStatus.SetTitle(fmt.Sprintf("● %s · effort:%s · %s", s.Model, eff, login))
-	systray.SetTitle("LR " + glyph)
+	mStatus.SetTitle(fmt.Sprintf("● :%d · %s · effort:%s · %s", s.Port, s.Model, eff, login))
+	url := "default (api.anthropic.com)"
+	if s.AnthropicBaseURL != nil && *s.AnthropicBaseURL != "" {
+		url = *s.AnthropicBaseURL
+	}
+	if mURL != nil {
+		mURL.SetTitle("URL: " + url)
+	}
+	// main icon = logo only; state lives in the menu (no glyph on the title)
 	for i, it := range modelItems {
 		if models[i] == s.Model {
 			it.Check()
@@ -207,6 +227,8 @@ func onReady() {
 
 	mStatus = systray.AddMenuItem("…", "")
 	mStatus.Disable()
+	mURL = systray.AddMenuItem("URL: …", "")
+	mURL.Disable()
 	systray.AddSeparator()
 
 	mLogin := systray.AddMenuItem("Login (claude)…", "opens a terminal running claude login")

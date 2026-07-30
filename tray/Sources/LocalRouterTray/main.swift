@@ -15,6 +15,7 @@ struct Status: Decodable {
     var model: String
     var effort: String?
     var queueDepth: Int
+    var anthropicBaseUrl: String?
 }
 
 enum Control {
@@ -97,8 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func rebuild() {
         let s = last
-        // logo image is set once; the title carries the at-a-glance state glyph
-        item.button?.title = s == nil ? " ○" : (s!.loggedIn ? " ●" : " ⚠")
+        // main icon = logo only (no status glyph); state lives inside the menu
 
         let m = NSMenu()
         let headTitle: String
@@ -111,6 +111,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let head = NSMenuItem(title: headTitle, action: nil, keyEquivalent: "")
         head.isEnabled = false
         m.addItem(head)
+        if let s {
+            let url = s.anthropicBaseUrl ?? "default (api.anthropic.com)"
+            let urlItem = NSMenuItem(title: "URL: \(url)", action: nil, keyEquivalent: "")
+            urlItem.isEnabled = false
+            m.addItem(urlItem)
+        }
         m.addItem(.separator())
 
         m.addItem(mk("Login (claude)…", #selector(doLogin)))
@@ -165,6 +171,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coreProc = spawnCore()
         refreshSoon()
     }
+
+    func alert(_ title: String, _ info: String) {
+        NSApp.activate(ignoringOtherApps: true)
+        let a = NSAlert()
+        a.messageText = title
+        a.informativeText = info
+        a.runModal()
+    }
     @objc func stopCore() {
         Control.shutdown() // graceful; core exits, next poll shows stopped
         coreProc = nil
@@ -176,22 +190,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func spawnCore() -> Process? {
         let env = ProcessInfo.processInfo.environment
         let p = Process()
-        if let c = env["LR_CORE"], !c.isEmpty {
-            let parts = c.split(separator: " ").map(String.init)
-            p.executableURL = URL(fileURLWithPath: parts[0])
-            p.arguments = Array(parts.dropFirst())
-        } else if let exeDir = Bundle.main.executableURL?.deletingLastPathComponent(),
-                  FileManager.default.isExecutableFile(atPath: exeDir.appendingPathComponent("localrouter-core").path) {
+        // GUI-launched apps get a stripped PATH (no ~/.bun/bin), so `bun` won't resolve.
+        // Prefer the bundled self-contained binary; for the dev fallback run through a
+        // LOGIN shell so the user's PATH (bun) is loaded.
+        if let exeDir = Bundle.main.executableURL?.deletingLastPathComponent(),
+           FileManager.default.isExecutableFile(atPath: exeDir.appendingPathComponent("localrouter-core").path) {
             p.executableURL = exeDir.appendingPathComponent("localrouter-core")
-            // bundled dashboard lives in ../Resources/web/dist (build-app.sh); serve it via cwd
             p.currentDirectoryURL = exeDir.deletingLastPathComponent().appendingPathComponent("Resources")
-        } else {
-            let repo = env["LR_REPO"] ?? FileManager.default.currentDirectoryPath
-            p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            p.arguments = ["bun", "\(repo)/core/server.ts"]
+        } else if let c = env["LR_CORE"], !c.isEmpty {
+            p.executableURL = URL(fileURLWithPath: "/bin/zsh")
+            p.arguments = ["-lc", c]
+            if let repo = env["LR_REPO"] { p.currentDirectoryURL = URL(fileURLWithPath: repo) }
+        } else if let repo = env["LR_REPO"] {
+            p.executableURL = URL(fileURLWithPath: "/bin/zsh")
+            p.arguments = ["-lc", "bun \(repo)/core/server.ts"]
             p.currentDirectoryURL = URL(fileURLWithPath: repo)
+        } else {
+            alert("Can't start the core",
+                  "No bundled core and no LR_REPO/LR_CORE set. Either open the packaged LocalRouter.app (run tray/build-app.sh) or launch the tray with LR_REPO=/path/to/LocalRouter.")
+            return nil
         }
-        do { try p.run(); return p } catch { return nil }
+        do { try p.run(); return p } catch {
+            alert("Start failed", "\(error)")
+            return nil
+        }
     }
 }
 
