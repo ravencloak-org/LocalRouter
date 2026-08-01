@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getConfig } from "./config";
 
-const N = Number(process.env.LR_CONCURRENCY ?? 4); // bounded semaphore (PLAN.md)
+const N = Number(process.env.LR_CONCURRENCY ?? 8); // bounded semaphore (PLAN.md)
 const TIMEOUT_MS = Number(process.env.LR_TIMEOUT_MS ?? 300_000);
 
 // Isolation: strip Claude Code's agent context so each spawn is a lean LLM call, not a
@@ -59,8 +59,10 @@ export type ClaudeResult = {
 export async function* runClaude(
   system: string,
   prompt: string,
+  onSpawn?: () => void, // fired once a semaphore slot is won, before spawn — lets callers show a real queued->spawning transition
 ): AsyncGenerator<string, ClaudeResult> {
   await acquire();
+  onSpawn?.();
   const { model, effort, anthropicBaseUrl } = getConfig(); // live: dashboard changes apply next request
   const args = ["-p", "--output-format", "stream-json", "--verbose", "--model", model];
   if (effort) args.push("--effort", effort); // level selector: low|medium|high

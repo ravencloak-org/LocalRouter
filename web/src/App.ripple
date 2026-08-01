@@ -19,7 +19,8 @@ type Row = {
 function phaseColor(phase: string, httpStatus?: number): string {
   if (phase === "error" || (httpStatus != null && httpStatus >= 400)) return "bg-red-500";
   if (phase === "done") return "bg-emerald-500";
-  return "bg-amber-500"; // queued / spawning / streaming
+  if (phase === "queued") return "bg-slate-400"; // waiting for a semaphore slot — distinct from active
+  return "bg-amber-500"; // spawning / streaming = actively running
 }
 function rowLine(r: Row): string {
   const bits: string[] = [r.phase];
@@ -111,9 +112,9 @@ export function App() {
   const es = new EventSource("/events");
   es.onmessage = (m) => {
     const ev = JSON.parse(m.data) as LrEvent;
-    events.push(ev);
+    if (ev.kind !== "request") return; // logs/tokens/spans are not request rows — skip reactive churn
+    events.push(ev); // only request events feed the stat tiles
     if (events.length > 500) events.shift();
-    if (ev.kind !== "request") return; // logs/tokens/spans are not request rows
     let r = rowMap.get(ev.requestId);
     if (!r) {
       r = { id: ev.requestId, client: ev.client ?? "unknown", model: ev.model, phase: ev.phase, ts: ev.ts, phases: [] };

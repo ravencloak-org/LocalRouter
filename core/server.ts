@@ -222,14 +222,13 @@ app.post("/v1/chat/completions", async (c) => {
       const created = Math.floor(now() / 1000);
       let full = "";
       try {
-        emit({ kind: "request", requestId, client, model, phase: "streaming" });
-        const gen = runClaude(system, prompt);
+        const gen = runClaude(system, prompt,
+          () => emit({ kind: "request", requestId, client, model, phase: "streaming" }));
         let r = await gen.next();
         while (!r.done) {
           full += r.value;
-          // ponytail: also broadcasts every token to all /events subscribers; add
-          // throttle + focus-only subscription per PLAN.md before this gets loud.
-          emit({ kind: "token", requestId, delta: r.value });
+          // note: no per-token /events broadcast — the dashboard never renders deltas
+          // (App.ripple drops kind:"token"), and it floods subscribers / hangs the UI scroll.
           await ss.writeSSE({
             data: JSON.stringify({ id, object: "chat.completion.chunk", created, model, choices: [{ index: 0, delta: { content: r.value }, finish_reason: null }] }),
           });
@@ -253,8 +252,8 @@ app.post("/v1/chat/completions", async (c) => {
 
   // non-stream: drain generator, return one complete chat.completion
   try {
-    emit({ kind: "request", requestId, client, model, phase: "spawning" });
-    const gen = runClaude(system, prompt);
+    const gen = runClaude(system, prompt,
+      () => emit({ kind: "request", requestId, client, model, phase: "spawning" }));
     let r = await gen.next();
     while (!r.done) r = await gen.next();
     const res = r.value;
