@@ -173,7 +173,7 @@ app.get("/healthz", async (c) => {
 });
 
 app.get("/v1/models", (c) =>
-  c.json({ object: "list", data: [{ id: "claude", object: "model", owned_by: "anthropic" }] }));
+  c.json({ object: "list", data: ["sonnet", "opus", "haiku"].map((id) => ({ id, object: "model", owned_by: "anthropic" })) }));
 
 app.post("/v1/embeddings", (c) =>
   c.json(errBody("No embeddings on the claude CLI. Route EMBEDDING_* to TEI / OpenAI / Voyage.", "unsupported"), 400));

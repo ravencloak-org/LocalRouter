@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="LocalRouter" width="128" height="128">
+</p>
+
 # LocalRouter
 
 An OpenAI-compatible HTTP API that routes chat calls to the real `claude` CLI, so any

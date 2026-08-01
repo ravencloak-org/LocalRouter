@@ -234,7 +234,6 @@ func updateUI(s *status) {
 
 func onReady() {
 	systray.SetIcon(trayIcon()) // ICO on Windows, PNG on linux/mac
-	systray.SetTitle("LR")
 	systray.SetTooltip("LocalRouter")
 
 	mStatus = systray.AddMenuItem("…", "")
