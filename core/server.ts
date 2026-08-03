@@ -364,6 +364,7 @@ app.get("/events", (c) =>
 // dev (cwd/web/dist), the .app bundle (<exe>/../Resources/web/dist), or binary-adjacent.
 const exeDir = dirname(process.execPath);
 const distRoot = [
+  join(import.meta.dir, "..", "web", "dist"), // dev: server.ts lives in core/, dist is a sibling — cwd-independent (dev script cd's into core/)
   join(process.cwd(), "web", "dist"),
   join(exeDir, "..", "Resources", "web", "dist"),
   join(exeDir, "web", "dist"),
