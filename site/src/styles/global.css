@@ -172,15 +172,15 @@ footer .brand { color: var(--muted); }
 footer a { color: var(--muted); }
 footer a:hover { color: var(--coral); }
 .foot-spacer { flex: 1; }
-.by-raven { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.9rem; color: #fff; }
-.by-raven img { height: 20px; width: auto; opacity: 0.92; }
+.by-raven { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; color: #fff; }
+.by-raven img { height: 18px; width: auto; opacity: 0.92; }
 .by-raven:hover { color: var(--coral); }
 .by-raven:hover img { opacity: 1; }
-/* hero brand: moose | (LocalRouter  by [RAVEN logo]) — RAVEN sits at the right end of the wordmark */
-.brand-name { display: flex; align-items: flex-end; gap: 0.5rem; }
+/* hero brand: moose | (LocalRouter over "by Raven [mark]") — by-raven sits BELOW the wordmark, right-aligned to its end */
+.brand-name { display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem; }
 .brand-name .wordmark { line-height: 1; }
-.hero-brand .by-raven { align-self: flex-end; margin-bottom: 0.35rem; }
-.hero-brand .by-raven img { height: 26px; }
+.hero-brand .by-raven { font-size: 0.95rem; }
+.hero-brand .by-raven img { height: 22px; }
 /* footer credit (Flaticon attribution) */
 .credit { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line); }
 .credit a { color: var(--faint); font-size: 0.82rem; }
