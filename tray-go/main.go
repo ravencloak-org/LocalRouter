@@ -44,9 +44,15 @@ var (
 	mErr        *systray.MenuItem
 	mStart      *systray.MenuItem
 	mStop       *systray.MenuItem
+	mUpdate     *systray.MenuItem // "Install update" — hidden until one is available
+	mCheck      *systray.MenuItem
+	mAuto       *systray.MenuItem // auto-update toggle (checkbox)
 	modelItems  []*systray.MenuItem
 	effortItems []*systray.MenuItem
 	coreProc    *exec.Cmd // core spawned by the tray (Start), so Stop can restart it
+
+	cfg         trayConfig // persisted tray prefs (auto-update)
+	availableRel *release  // latest newer release, when found
 )
 
 // spawnCore launches the core: $LR_CORE ("cmd arg..") -> bundled localrouter-core (cwd = its
@@ -271,7 +277,17 @@ func onReady() {
 	mStop = systray.AddMenuItem("Stop Core", "")
 	mDash := systray.AddMenuItem("Open Dashboard", "")
 	systray.AddSeparator()
+	mUpdate = systray.AddMenuItem("⤓ Install update", "")
+	mUpdate.Hide()
+	mCheck = systray.AddMenuItem("Check for Updates…", "")
+	cfg = loadConfig()
+	mAuto = systray.AddMenuItemCheckbox("Auto-update in Background", "", cfg.AutoUpdate)
+	mVer := systray.AddMenuItem("Version "+version, "")
+	mVer.Disable()
+	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Quit Tray", "")
+
+	go updateLoop() // periodic GitHub release check
 
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
@@ -294,6 +310,18 @@ func onReady() {
 				coreProc = nil
 				time.Sleep(400 * time.Millisecond)
 				updateUI(getStatus())
+			case <-mUpdate.ClickedCh:
+				go doInstall()
+			case <-mCheck.ClickedCh:
+				go runCheck(true)
+			case <-mAuto.ClickedCh:
+				cfg.AutoUpdate = !cfg.AutoUpdate
+				if cfg.AutoUpdate {
+					mAuto.Check()
+				} else {
+					mAuto.Uncheck()
+				}
+				saveConfig(cfg)
 			case <-mQuit.ClickedCh:
 				systray.Quit()
 				return

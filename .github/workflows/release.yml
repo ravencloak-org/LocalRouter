@@ -68,8 +68,49 @@ jobs:
           name: LocalRouter-macos
           path: LocalRouter-macos.zip
 
+  # Windows/Linux tray bundles: tray + core + dashboard in one zip, consumed by the
+  # in-app self-updater. Zip name uses GOOS/GOARCH tokens (updater.go bundleAsset()).
+  build-tray:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            bun-target: bun-linux-x64
+            ext: ""
+          - os: linux
+            arch: arm64
+            bun-target: bun-linux-arm64
+            ext: ""
+          - os: windows
+            arch: amd64
+            bun-target: bun-windows-x64
+            ext: ".exe"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tray-go/go.mod
+      - name: Build bundle
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          STAGE="$PWD/stage"
+          mkdir -p "$STAGE/web"
+          ( cd web && bun install && bun run build )
+          cp -R web/dist "$STAGE/web/dist"
+          ( cd core && bun install && bun build server.ts --compile --target=${{ matrix.bun-target }} --outfile "$STAGE/localrouter-core${{ matrix.ext }}" )
+          ( cd tray-go && GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags "-X main.version=$VER" -o "$STAGE/localrouter-tray${{ matrix.ext }}" . )
+          ( cd "$STAGE" && zip -r "$PWD/../LocalRouter-${{ matrix.os }}-${{ matrix.arch }}.zip" . )
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LocalRouter-${{ matrix.os }}-${{ matrix.arch }}
+          path: LocalRouter-${{ matrix.os }}-${{ matrix.arch }}.zip
+
   release:
-    needs: [build-core, build-mac-app]
+    needs: [build-core, build-mac-app, build-tray]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -91,7 +132,7 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           bash scripts/release-fill.sh "$VERSION" artifacts
-          ( cd artifacts && shasum -a 256 localrouter-* LocalRouter-macos.zip > checksums.txt )
+          ( cd artifacts && shasum -a 256 localrouter-* LocalRouter-*.zip > checksums.txt )
           # ship the filled packaging files as release assets (tap + flake consumers grab these)
           cp flake.nix artifacts/flake.nix
           cp packaging/homebrew/Formula/localrouter.rb artifacts/formula-localrouter.rb
