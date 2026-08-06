@@ -172,15 +172,21 @@ footer .brand { color: var(--muted); }
 footer a { color: var(--muted); }
 footer a:hover { color: var(--coral); }
 .foot-spacer { flex: 1; }
-.by-raven { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.92rem; }
-.by-raven img { width: 16px; height: 16px; opacity: 0.9; }
+.by-raven { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.9rem; color: #fff; }
+.by-raven img { height: 20px; width: auto; opacity: 0.92; }
+.by-raven:hover { color: var(--coral); }
 .by-raven:hover img { opacity: 1; }
-/* hero brand: LocalRouter wordmark + "by Raven" stacked to the right of the moose */
-.brand-stack { display: flex; flex-direction: column; gap: 0.15rem; align-items: flex-start; }
-.brand-stack .wordmark { line-height: 1; }
-.hero-brand .by-raven { color: var(--muted); font-size: 0.85rem; }
-.hero-brand .by-raven:hover { color: var(--coral); }
-.hero-brand .by-raven img { width: 18px; height: 18px; }
+/* hero brand: moose | (LocalRouter  by [RAVEN logo]) — RAVEN sits at the right end of the wordmark */
+.brand-name { display: flex; align-items: flex-end; gap: 0.5rem; }
+.brand-name .wordmark { line-height: 1; }
+.hero-brand .by-raven { align-self: flex-end; margin-bottom: 0.35rem; }
+.hero-brand .by-raven img { height: 26px; }
+/* footer credit (Flaticon attribution) */
+.credit { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.credit a { color: var(--faint); font-size: 0.82rem; }
+.credit a:hover { color: var(--muted); }
+/* bound the install code block so long commands scroll, never overflow the page */
+.install, .tabpanel, .block, .block pre { max-width: 100%; min-width: 0; }
 
 /* --- entrance motion --- */
 /* Content is ALWAYS visible (no JS dependency, nothing can stay hidden). A single
