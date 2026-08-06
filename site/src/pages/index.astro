@@ -30,7 +30,6 @@ const jsonld = {
 <!doctype html>
 <html lang="en">
   <head>
-    <script is:inline>document.documentElement.classList.add("js");</script>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
@@ -267,6 +266,7 @@ const jsonld = {
     <footer>
       <div class="wrap">
         <a class="brand" href="/"><img src="/moose.png" alt="" width="22" height="22" style="width:22px;height:22px" /> LocalRouter</a>
+        <a class="by-raven" href="https://ravencloak.org" title="by Raven — ravencloak.org">by <img src="/raven.svg" alt="Raven" /></a>
         <span class="foot-spacer"></span>
         <a href="https://github.com/ravencloak-org/LocalRouter">GitHub</a>
         <span class="mono">v0.1.6</span>
@@ -294,40 +294,6 @@ const jsonld = {
         });
       }));
 
-      // one authored moment: rise-in + count-up on scroll
-      const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-      const io = new IntersectionObserver((entries) => {
-        for (const e of entries) {
-          if (!e.isIntersecting) continue;
-          e.target.classList.add("in");
-          const num = e.target.querySelector<HTMLElement>("[data-count]");
-          if (num && !reduce) countUp(num);
-          io.unobserve(e.target);
-        }
-      }, { threshold: 0.3 });
-      document.querySelectorAll(".rise").forEach((el) => io.observe(el));
-
-      function countUp(el: HTMLElement) {
-        const target = Number(el.dataset.count || 0);
-        const usdMode = el.dataset.usd === "1";
-        const usdFmt = (n: number) => n < 1 ? "$" + n.toFixed(4) : n < 100 ? "$" + n.toFixed(2) : "$" + Math.round(n).toLocaleString("en-US");
-        const fmt = (n: number) => usdMode ? usdFmt(n) : short(n);
-        const start = performance.now(), dur = 1100;
-        const tick = (now: number) => {
-          const p = Math.min(1, (now - start) / dur);
-          const eased = 1 - Math.pow(1 - p, 4);
-          el.textContent = fmt(target * eased);
-          if (p < 1) requestAnimationFrame(tick);
-          else el.textContent = fmt(target);
-        };
-        requestAnimationFrame(tick);
-      }
-      function short(n: number) {
-        if (n < 1000) return String(Math.round(n));
-        const u = ["k", "M", "B"]; let i = -1, v = n;
-        while (v >= 1000 && i < u.length - 1) { v /= 1000; i++; }
-        return (v >= 100 ? Math.round(v) : v.toFixed(1)) + u[i];
-      }
     </script>
   </body>
 </html>
