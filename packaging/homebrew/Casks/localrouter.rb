@@ -10,7 +10,7 @@ cask "localrouter" do
   desc "Menu-bar app for LocalRouter"
   homepage "https://github.com/ravencloak-org/LocalRouter"
 
-  depends_on macos: ">= :ventura"
+  depends_on macos: :ventura
 
   app "LocalRouter.app"
 
