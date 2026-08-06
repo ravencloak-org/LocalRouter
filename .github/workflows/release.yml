@@ -44,7 +44,8 @@ jobs:
         run: |
           cd core
           bun install
-          bun build server.ts --compile --target=${{ matrix.bun-target }} --outfile ../dist/localrouter-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+          VER="${GITHUB_REF_NAME#v}"
+          bun build server.ts --compile --target=${{ matrix.bun-target }} --define "process.env.LR_VERSION=\"$VER\"" --outfile ../dist/localrouter-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
       - uses: actions/upload-artifact@v4
         with:
           name: localrouter-${{ matrix.os }}-${{ matrix.arch }}
@@ -101,7 +102,7 @@ jobs:
           mkdir -p "$STAGE/web"
           ( cd web && bun install && bun run build )
           cp -R web/dist "$STAGE/web/dist"
-          ( cd core && bun install && bun build server.ts --compile --target=${{ matrix.bun-target }} --outfile "$STAGE/localrouter-core${{ matrix.ext }}" )
+          ( cd core && bun install && bun build server.ts --compile --target=${{ matrix.bun-target }} --define "process.env.LR_VERSION=\"$VER\"" --outfile "$STAGE/localrouter-core${{ matrix.ext }}" )
           ( cd tray-go && GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags "-X main.version=$VER" -o "$STAGE/localrouter-tray${{ matrix.ext }}" . )
           ( cd "$STAGE" && zip -r "$PWD/../LocalRouter-${{ matrix.os }}-${{ matrix.arch }}.zip" . )
       - uses: actions/upload-artifact@v4

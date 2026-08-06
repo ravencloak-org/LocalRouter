@@ -8,7 +8,7 @@ cd web && bun install && bun run build
 cd "$ROOT"
 
 # 2. Compile the core (bundles web/dist path lookup at runtime, not the files)
-cd core && bun build server.ts --compile --outfile "$ROOT/dist/localrouter"
+cd core && bun build server.ts --compile --define "process.env.LR_VERSION=\"${LR_VERSION:-0.0.0-dev}\"" --outfile "$ROOT/dist/localrouter"
 cd "$ROOT"
 
 echo "built: $ROOT/dist/localrouter"

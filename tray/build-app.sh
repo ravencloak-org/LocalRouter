@@ -20,7 +20,7 @@ sips -s format icns ../assets/logo.png --out "$APP/Contents/Resources/icon.icns"
 # The tray spawns localrouter-core with cwd = Contents/Resources, so it serves ./web/dist.
 # NOT guarded with `|| true`: a coreless/dashboard-less .app is worse than a failed build.
 ( cd ../web && bun install && bun run build )
-( cd ../core && bun build server.ts --compile --outfile "$OLDPWD/$APP/Contents/MacOS/localrouter-core" )
+( cd ../core && bun build server.ts --compile --define "process.env.LR_VERSION=\"${VERSION#v}\"" --outfile "$OLDPWD/$APP/Contents/MacOS/localrouter-core" )
 mkdir -p "$APP/Contents/Resources/web"
 cp -R ../web/dist "$APP/Contents/Resources/web/dist"
 [ -x "$APP/Contents/MacOS/localrouter-core" ] || { echo "error: localrouter-core missing from bundle" >&2; exit 1; }

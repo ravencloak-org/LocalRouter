@@ -380,7 +380,9 @@ if (distRoot) {
     c.html("<!doctype html><title>LocalRouter</title><body style=font-family:system-ui;padding:2rem><h1>LocalRouter</h1><p>dashboard not built — run <code>scripts/build.sh</code></p>", 200));
 }
 
-export const VERSION = "0.1.0";
+// Stamped at compile time via `bun build --define process.env.LR_VERSION='"X.Y.Z"'`
+// (release CI, build-app.sh, build.sh). Unstamped dev builds report 0.0.0-dev.
+export const VERSION = process.env.LR_VERSION ?? "0.0.0-dev";
 if (process.argv.includes("--version")) {
   console.log(`localrouter ${VERSION}`);
   process.exit(0); // brew/nix test hook, and CLI convention
