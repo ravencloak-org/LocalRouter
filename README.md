@@ -95,9 +95,21 @@ LLM (LocalRouter) from embeddings.
 |---|---|---|
 | `LR_PORT` | 8083 | core port |
 | `LR_MODEL` | sonnet | CLI model all requests map to |
-| `LR_CONCURRENCY` | 4 | bounded semaphore (parallel CLI subprocesses) |
+| `LR_CONCURRENCY` | 8 | bounded semaphore (parallel CLI subprocesses) |
 | `LR_TIMEOUT_MS` | 300000 | per-request kill deadline |
 | `LR_RING` | 1000 | in-memory Event ring buffer size |
+| `LR_APTABASE_APP_KEY` | (unset) | enable anonymous telemetry (see below); unset = off |
+| `LR_APTABASE_HOST` | (unset) | self-hosted Aptabase base URL (only for `A-SH-…` keys) |
+| `LR_TELEMETRY` / `DO_NOT_TRACK` | (unset) | set `LR_TELEMETRY=0` or `DO_NOT_TRACK=1` to force telemetry off |
+
+## Telemetry
+
+**Off by default.** Nothing is sent unless you set `LR_APTABASE_APP_KEY`. When enabled it emits
+one anonymous [Aptabase](https://aptabase.com) event per completed request containing **only**:
+`model`, `tokens_in`, `tokens_out`, and `usd_saved` (the API-equivalent cost your subscription
+covered). It never sends prompts, responses, client tokens, or IPs. Kill it any time with
+`DO_NOT_TRACK=1` or `LR_TELEMETRY=0`. These aggregate numbers (installs, tokens served, $ saved)
+power the public stats page.
 
 ## Status: scaffold
 

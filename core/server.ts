@@ -9,6 +9,7 @@ import { Database } from "bun:sqlite";
 import { bus, uid } from "./bus";
 import { runClaude, queueDepth, cliAlive, CliError, TimeoutError, type ClaudeResult } from "./claude";
 import { getConfig, setConfig, type Effort, type Config } from "./config";
+import { track } from "./telemetry";
 import type { LrEvent, OpenAIError } from "../shared/events";
 
 const app = new Hono();
@@ -239,6 +240,7 @@ app.post("/v1/chat/completions", async (c) => {
         finishReq(requestId, client, model, t0, r.value);
         putRecord({ id: requestId, ts: t0, client, model, stream: true, messages: body.messages, response: full || r.value.text,
           promptTokens: r.value.inputTokens, completionTokens: r.value.outputTokens, costUsd: r.value.costUsd, latencyMs: now() - t0, httpStatus: 200 });
+        track("request", { model, tokens_in: r.value.inputTokens, tokens_out: r.value.outputTokens, usd_saved: r.value.costUsd });
       } catch (err) {
         const [status, type, detail] = classify(err);
         failReq(requestId, client, model, t0, status, type, detail);
@@ -260,6 +262,7 @@ app.post("/v1/chat/completions", async (c) => {
     finishReq(requestId, client, model, t0, res);
     putRecord({ id: requestId, ts: t0, client, model, stream: false, messages: body.messages, response: res.text,
       promptTokens: res.inputTokens, completionTokens: res.outputTokens, costUsd: res.costUsd, latencyMs: now() - t0, httpStatus: 200 });
+    track("request", { model, tokens_in: res.inputTokens, tokens_out: res.outputTokens, usd_saved: res.costUsd });
     return c.json({
       id: chatId(),
       object: "chat.completion",
