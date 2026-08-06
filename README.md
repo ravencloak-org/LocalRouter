@@ -35,7 +35,26 @@ Control surfaces (ADR-0003): the **dashboard** is universal (all OSes); the **ma
 is a native convenience. Linux/BSD/Windows use the dashboard; a Go tray for win/linux is a
 later add.
 
-## Run
+## Install
+
+**Homebrew** (macOS + Linux):
+```bash
+brew tap ravencloak-org/localrouter
+brew install localrouter          # headless core (mac + linux)
+brew install --cask localrouter   # macOS menu-bar app
+```
+
+**Nix** (Linux/server + mac CLI):
+```bash
+nix run github:ravencloak-org/LocalRouter              # run the core
+nix profile install github:ravencloak-org/LocalRouter  # install it
+```
+
+All install paths need the `claude` CLI installed and logged in (`claude login`) — it's a
+runtime dependency LocalRouter drives, not bundled. macOS cask is unsigned (v0): right-click →
+Open on first launch.
+
+## Run from source
 
 ```bash
 bun install
@@ -43,12 +62,10 @@ bun run dev      # core on :8083
 bun run web      # dashboard on :5173 (proxies /v1, /events, /healthz to core)
 ```
 
-Requires the `claude` CLI installed and logged in (`claude login`).
-
 Test:
 ```bash
 curl localhost:8083/v1/chat/completions -H 'content-type: application/json' \
-  -d '{"model":"claude","messages":[{"role":"user","content":"say hi"}]}'
+  -d '{"model":"sonnet","messages":[{"role":"user","content":"say hi"}]}'
 curl localhost:8083/healthz
 ```
 
