@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "audit": "unlighthouse --site https://localrouter.pages.dev"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.3",
@@ -13,5 +14,8 @@
     "@fontsource/jetbrains-mono": "^5.1.0",
     "@fontsource/space-grotesk": "^5.1.0",
     "astro": "^5.13.0"
+  },
+  "devDependencies": {
+    "unlighthouse": "^0.17.0"
   }
 }

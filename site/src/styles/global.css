@@ -24,7 +24,8 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; overflow-x: clip; }
+img, svg, pre, video { max-width: 100%; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
 body {
@@ -172,8 +173,14 @@ footer a { color: var(--muted); }
 footer a:hover { color: var(--coral); }
 .foot-spacer { flex: 1; }
 .by-raven { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.92rem; }
-.by-raven img { height: 16px; width: auto; opacity: 0.85; }
+.by-raven img { width: 16px; height: 16px; opacity: 0.9; }
 .by-raven:hover img { opacity: 1; }
+/* hero brand: LocalRouter wordmark + "by Raven" stacked to the right of the moose */
+.brand-stack { display: flex; flex-direction: column; gap: 0.15rem; align-items: flex-start; }
+.brand-stack .wordmark { line-height: 1; }
+.hero-brand .by-raven { color: var(--muted); font-size: 0.85rem; }
+.hero-brand .by-raven:hover { color: var(--coral); }
+.hero-brand .by-raven img { width: 18px; height: 18px; }
 
 /* --- entrance motion --- */
 /* Content is ALWAYS visible (no JS dependency, nothing can stay hidden). A single
@@ -186,6 +193,10 @@ footer a:hover { color: var(--coral); }
 
 /* --- responsive --- */
 @media (max-width: 760px) {
+  .wrap { padding-inline: 1.15rem; }
+  .hero h1 { font-size: clamp(2rem, 8.5vw, 3.2rem); }
+  .hero-brand img { width: clamp(56px, 15vw, 84px); }
+  .hero-brand .wordmark { font-size: clamp(1.5rem, 6.5vw, 2.2rem); }
   .mech { grid-template-columns: 1fr; }
   .mech-arrow { transform: rotate(90deg); padding: 0.25rem 0; }
   .stat-row { grid-template-columns: 1fr; gap: 2.25rem; }
