@@ -54,6 +54,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2 # build-app.sh compiles localrouter-core + dashboard with bun; without this they silently skip and the .app ships coreless
       - name: Build Mac tray app
         run: |
           cd tray

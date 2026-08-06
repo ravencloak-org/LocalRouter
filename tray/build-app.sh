@@ -15,10 +15,12 @@ sips -s format icns ../assets/logo.png --out "$APP/Contents/Resources/icon.icns"
 
 # bundle the core binary + built dashboard so "Start Core" works from the .app standalone.
 # The tray spawns localrouter-core with cwd = Contents/Resources, so it serves ./web/dist.
-( cd ../web && bun install >/dev/null 2>&1 && bun run build >/dev/null 2>&1 ) || true
-( cd ../core && bun build server.ts --compile --outfile "$OLDPWD/$APP/Contents/MacOS/localrouter-core" ) || true
+# NOT guarded with `|| true`: a coreless/dashboard-less .app is worse than a failed build.
+( cd ../web && bun install && bun run build )
+( cd ../core && bun build server.ts --compile --outfile "$OLDPWD/$APP/Contents/MacOS/localrouter-core" )
 mkdir -p "$APP/Contents/Resources/web"
-cp -R ../web/dist "$APP/Contents/Resources/web/dist" 2>/dev/null || true
+cp -R ../web/dist "$APP/Contents/Resources/web/dist"
+[ -x "$APP/Contents/MacOS/localrouter-core" ] || { echo "error: localrouter-core missing from bundle" >&2; exit 1; }
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
