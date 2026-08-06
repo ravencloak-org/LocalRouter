@@ -22,12 +22,19 @@ Tag `vX.Y.Z` → GitHub Actions matrix:
   `flake.nix` + the formula/cask; attaches the filled files + `checksums.txt` as release assets.
 - attach all to the Release.
 
-After a release: commit the filled `flake.nix` to `main`, and copy the `formula-localrouter.rb`
-/ `cask-localrouter.rb` assets into the `ravencloak-org/homebrew-localrouter` tap. (Fully
-automated tap/flake bumping needs a PAT + ordering care — follow-up.)
+After a release (manual back-fill, done each tag):
+1. `gh release download vX.Y.Z -p flake.nix` → overwrite repo `flake.nix`, commit to `main`
+   (so `nix run github:ravencloak-org/LocalRouter` picks up the new version + hashes).
+2. `gh release download vX.Y.Z -p formula-localrouter.rb -p cask-localrouter.rb` → copy into
+   the tap as `Formula/localrouter.rb` + `Casks/localrouter.rb`, commit + push.
+
+The tap repo **`ravencloak-org/homebrew-localrouter` exists** (public). Fully automated
+tap/flake bumping in CI needs a PAT + ordering care — still a follow-up.
 
 ### Homebrew (macOS + Linux CLI)
-Tap: `ravencloak-org/localrouter`.
+Tap: `ravencloak-org/localrouter` (repo `ravencloak-org/homebrew-localrouter`, live).
+Install: `brew tap ravencloak-org/localrouter && brew install localrouter` (core) or
+`brew install --cask localrouter` (menu-bar app).
 - **cask** `localrouter` → the macOS `.app` (menu bar). Unsigned v0 → Gatekeeper prompt
   (right-click Open) or notarize later ($99 Apple dev).
 - **formula** `localrouter` → the headless core binary (for CLI/server users, mac + linux).
@@ -63,9 +70,9 @@ repo — the release attaches filled copies for the tap.
 
 ## Known gotchas (from integration)
 
-- **Static root is cwd-relative.** The compiled core serves `./web/dist` — run it from a dir
-  that contains `web/dist`, or it shows the "not built" fallback. Packaging must co-locate them
-  (or embed the dashboard later).
+- **Static root resolution.** The core resolves the dashboard from `import.meta.dir/../web/dist`
+  first (cwd-independent), then cwd + exe-adjacent fallbacks. Packaging still co-locates
+  `web/dist` beside the binary (or embed the dashboard later).
 - **Dashboard is Ripple alpha, not vite-verified.** `bun run build` in `web/` may need syntax
   fixes (`@for` vs `for`, `track<T>()` generic). Flagged `// ponytail:` in `App.ripple`.
 - Core `--version` prints `localrouter <VERSION>` and exits (brew/nix test hook).
