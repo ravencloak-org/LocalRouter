@@ -27,7 +27,7 @@ function resolveHost(): string | undefined {
 }
 
 const BASE = resolveHost();
-export const telemetryEnabled =
+const telemetryEnabled =
   !!KEY && !!BASE && process.env.DO_NOT_TRACK !== "1" && process.env.LR_TELEMETRY !== "0";
 
 // one Aptabase session per process start; unique users are derived server-side
