@@ -19,13 +19,11 @@ const DEFAULT_HOST = "https://aptabase.jobin.wtf"; // for the A-SH default key
 
 const KEY = process.env.LR_APTABASE_APP_KEY || DEFAULT_APP_KEY;
 
-// host from the App-Key region: A-US-… / A-EU-… / A-SH-… (self-host needs LR_APTABASE_HOST)
+// Self-hosted only: always send to our own instance. LR_APTABASE_HOST overrides for anyone
+// pointing at a different self-hosted Aptabase. (No aptabase.com cloud path by design.)
 function resolveHost(): string | undefined {
-  const region = KEY?.split("-")[1];
-  if (region === "US") return "https://us.aptabase.com";
-  if (region === "EU") return "https://eu.aptabase.com";
-  if (region === "SH") return process.env.LR_APTABASE_HOST || DEFAULT_HOST; // self-hosted base URL
-  return undefined;
+  if (!KEY) return undefined;
+  return process.env.LR_APTABASE_HOST || DEFAULT_HOST;
 }
 
 const BASE = resolveHost();
