@@ -34,7 +34,7 @@ services:
       BASE_URL: ${APTABASE_BASE_URL}
       AUTH_SECRET: ${APTABASE_AUTH_SECRET}
       DATABASE_URL: "Server=aptabase_db;Port=5432;User Id=aptabase;Password=${APTABASE_PG_PW};Database=aptabase"
-      CLICKHOUSE_URL: "Host=aptabase_events_db;Port=9000;Username=aptabase;Password=${APTABASE_CH_PW};"
+      CLICKHOUSE_URL: "Host=aptabase_events_db;Port=8123;Username=aptabase;Password=${APTABASE_CH_PW};Protocol=http"
 
 volumes:
   db-data:
