@@ -69,6 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var timer: Timer?
     var coreProc: Process? // core spawned by the tray (Start), so Stop can restart it
     var lastError: String? // last Start failure, shown in the menu
+    let updater = Updater() // periodic GitHub release check + self-update
 
     func applicationDidFinishLaunching(_ n: Notification) {
         NSApp.setActivationPolicy(.accessory) // menu-bar only, no Dock icon
@@ -81,6 +82,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         rebuild()
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in self?.refresh() }
+        updater.onChange = { [weak self] in self?.rebuild() }
+        updater.start()
     }
 
     func refresh() {
@@ -130,6 +133,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             e.isEnabled = false
             m.addItem(e)
         }
+        if let rel = updater.available {
+            let up = mk("⤓ Install update: \(rel.version)", #selector(installUpdate))
+            up.attributedTitle = NSAttributedString(
+                string: "⤓ Install update: \(rel.version)",
+                attributes: [.font: NSFont.menuBarFont(ofSize: 0)])
+            m.addItem(up)
+        }
         m.addItem(.separator())
 
         m.addItem(mk("Login (claude)…", #selector(doLogin)))
@@ -165,6 +175,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         m.addItem(mk("Open Dashboard", #selector(openDashboard)))
         m.addItem(.separator())
+        m.addItem(mk("Check for Updates…", #selector(checkUpdates)))
+        let auto = mk("Auto-update in Background", #selector(toggleAutoUpdate))
+        auto.state = updater.autoUpdate ? .on : .off
+        m.addItem(auto)
+        let ver = NSMenuItem(title: "Version \(Updater.currentVersion)", action: nil, keyEquivalent: "")
+        ver.isEnabled = false
+        m.addItem(ver)
+        m.addItem(.separator())
         m.addItem(NSMenuItem(title: "Quit Tray", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = m
     }
@@ -179,6 +197,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func pickModel(_ i: NSMenuItem) { Control.setConfig(model: i.representedObject as? String); refreshSoon() }
     @objc func pickEffort(_ i: NSMenuItem) { Control.setConfig(effort: i.representedObject as? String); refreshSoon() }
     @objc func openDashboard() { if let u = URL(string: DASHBOARD) { NSWorkspace.shared.open(u) } }
+    @objc func installUpdate() { updater.install() }
+    @objc func checkUpdates() { updater.check(manual: true) }
+    @objc func toggleAutoUpdate() { updater.autoUpdate.toggle(); rebuild() }
 
     @objc func startCore() {
         if last != nil { return } // already running per last poll

@@ -58,7 +58,7 @@ jobs:
       - name: Build Mac tray app
         run: |
           cd tray
-          ./build-app.sh
+          LR_VERSION="${GITHUB_REF_NAME#v}" ./build-app.sh
       - name: Zip app
         run: |
           cd tray

@@ -3,6 +3,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# Real version (for the in-app updater's compare). CI passes the tag; local builds get a dev marker.
+VERSION="${LR_VERSION:-${1:-0.0.0-dev}}"
+
 swift build -c release
 APP="LocalRouter.app"
 rm -rf "$APP"
@@ -22,7 +25,7 @@ mkdir -p "$APP/Contents/Resources/web"
 cp -R ../web/dist "$APP/Contents/Resources/web/dist"
 [ -x "$APP/Contents/MacOS/localrouter-core" ] || { echo "error: localrouter-core missing from bundle" >&2; exit 1; }
 
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -32,7 +35,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleExecutable</key><string>LocalRouter</string>
   <key>CFBundleIconFile</key><string>icon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleShortVersionString</key><string>${VERSION#v}</string>
   <key>LSUIElement</key><true/>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
 </dict>
