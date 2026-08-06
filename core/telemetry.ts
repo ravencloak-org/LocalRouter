@@ -12,9 +12,10 @@ import { homedir, platform, release } from "node:os";
 import { join } from "node:path";
 
 // Project's own Aptabase app key, baked in so telemetry is ON BY DEFAULT for every install
-// (opt-out model, Homebrew-style). Replace "" with the real A-US-/A-EU-/A-SH- key from
-// aptabase.com. Users override with LR_APTABASE_APP_KEY (e.g. to self-host their own stats).
-const DEFAULT_APP_KEY = "";
+// (opt-out model, Homebrew-style). Self-hosted instance at aptabase.jobin.wtf.
+// Users override with LR_APTABASE_APP_KEY (+ LR_APTABASE_HOST) to point at their own stats.
+const DEFAULT_APP_KEY = "A-SH-6884260095";
+const DEFAULT_HOST = "https://aptabase.jobin.wtf"; // for the A-SH default key
 
 const KEY = process.env.LR_APTABASE_APP_KEY || DEFAULT_APP_KEY;
 
@@ -23,7 +24,7 @@ function resolveHost(): string | undefined {
   const region = KEY?.split("-")[1];
   if (region === "US") return "https://us.aptabase.com";
   if (region === "EU") return "https://eu.aptabase.com";
-  if (region === "SH") return process.env.LR_APTABASE_HOST; // self-hosted base URL
+  if (region === "SH") return process.env.LR_APTABASE_HOST || DEFAULT_HOST; // self-hosted base URL
   return undefined;
 }
 
