@@ -75,6 +75,14 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # git-cliff needs full history + tags to build the changelog
+      - name: Generate changelog
+        id: changelog
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest --strip header # only this tag's commits, grouped
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -91,4 +99,4 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*
-          generate_release_notes: true
+          body: ${{ steps.changelog.outputs.content }} # full changelog into the release description
