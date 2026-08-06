@@ -7,7 +7,9 @@
 //
 // ponytail: raw REST, no SDK - Aptabase ships no server SDK and the ingest API is
 // a single POST. Region host is derived from the App-Key prefix like the client SDKs.
-import { platform, release } from "node:os";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { homedir, platform, release } from "node:os";
+import { join } from "node:path";
 
 // Project's own Aptabase app key, baked in so telemetry is ON BY DEFAULT for every install
 // (opt-out model, Homebrew-style). Replace "" with the real A-US-/A-EU-/A-SH- key from
@@ -32,6 +34,20 @@ export const telemetryEnabled =
 // one Aptabase session per process start; unique users are derived server-side
 const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 const APP_VERSION = process.env.LR_VERSION ?? "0.0.0";
+
+// One-time opt-out notice, shown on first start where telemetry is actually on. A marker
+// file in the config dir keeps it to once-per-install. No notice when telemetry is off.
+export function noticeOnce(): void {
+  if (!telemetryEnabled) return;
+  const dir = process.env.LR_CONFIG_DIR ?? join(homedir(), ".config", "localrouter");
+  const marker = join(dir, "telemetry-notice-shown");
+  if (existsSync(marker)) return;
+  console.log(
+    "[LocalRouter] Anonymous usage stats are ON — model + token counts only, never prompts or content.\n" +
+    "              Turn them off any time: DO_NOT_TRACK=1 or LR_TELEMETRY=0.  See README#telemetry.",
+  );
+  try { mkdirSync(dir, { recursive: true }); writeFileSync(marker, new Date().toISOString()); } catch { /* best effort */ }
+}
 
 // Fire-and-forget. Never blocks or throws into the request path.
 export function track(eventName: string, props: Record<string, string | number | boolean>): void {

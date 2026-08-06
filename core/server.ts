@@ -9,7 +9,7 @@ import { Database } from "bun:sqlite";
 import { bus, uid } from "./bus";
 import { runClaude, queueDepth, cliAlive, CliError, TimeoutError, type ClaudeResult } from "./claude";
 import { getConfig, setConfig, type Effort, type Config } from "./config";
-import { track } from "./telemetry";
+import { track, noticeOnce } from "./telemetry";
 import type { LrEvent, OpenAIError } from "../shared/events";
 
 const app = new Hono();
@@ -395,3 +395,4 @@ try {
   Bun.serve({ port, hostname: "::1", fetch: app.fetch });
 } catch { /* IPv6 unavailable — IPv4 still serves */ }
 console.log(`[LocalRouter] core on localhost:${port} (127.0.0.1 + ::1)`);
+noticeOnce(); // one-time anonymous-telemetry opt-out notice (no-op when telemetry is off)
