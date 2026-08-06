@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://router.ravencloak.org/sitemap-index.xml

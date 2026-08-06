@@ -1,0 +1,333 @@
+---
+import "@fontsource/space-grotesk/500.css";
+import "@fontsource/space-grotesk/700.css";
+import "@fontsource/inter/400.css";
+import "@fontsource/inter/500.css";
+import "@fontsource/inter/600.css";
+import "@fontsource/jetbrains-mono/500.css";
+import "../styles/global.css";
+import { getStats, compact, usd } from "../lib/stats";
+
+const stats = await getStats();
+const siteUrl = "https://router.ravencloak.org";
+const repo = "https://github.com/ravencloak-org/LocalRouter";
+const title = "LocalRouter — Claude-to-OpenAI API router for your subscription";
+const desc =
+  "Local, OpenAI-compatible router that drives the real Claude CLI — use your Claude Max/Pro subscription from any OpenAI client. Local Claude routing, Claude-to-OpenAI API proxy, no API key, open source.";
+const jsonld = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "LocalRouter",
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "macOS, Linux, Windows",
+  description: desc,
+  url: siteUrl,
+  codeRepository: repo,
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+};
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <script is:inline>document.documentElement.classList.add("js");</script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={desc} />
+    <meta name="keywords" content="local Claude routing, Claude to OpenAI API router, Claude subscription proxy, OpenAI-compatible Claude, Claude Max proxy, Claude Pro API, claude CLI proxy, LocalRouter" />
+    <link rel="canonical" href={siteUrl} />
+    <meta name="theme-color" content="#120a0e" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="LocalRouter" />
+    <meta property="og:url" content={siteUrl} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={desc} />
+    <meta property="og:image" content={`${siteUrl}/og.png`} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={desc} />
+    <meta name="twitter:image" content={`${siteUrl}/og.png`} />
+
+    <script type="application/ld+json" is:inline set:html={JSON.stringify(jsonld)} />
+  </head>
+  <body>
+    <!-- nav -->
+    <nav class="nav">
+      <div class="wrap">
+        <a class="brand" href="/"><img src="/moose.png" alt="" width="26" height="26" /> LocalRouter</a>
+        <span class="nav-spacer"></span>
+        <a class="ghost" href="https://github.com/ravencloak-org/LocalRouter">GitHub</a>
+        <a class="btn btn-primary" href="#install">Install</a>
+      </div>
+    </nav>
+
+    <!-- hero -->
+    <header class="hero">
+      <div class="wrap">
+        <div class="hero-brand rise">
+          <img src="/moose.png" alt="LocalRouter logo" width="128" height="128" />
+          <span class="wordmark">LocalRouter</span>
+        </div>
+        <h1 class="rise">Point any OpenAI app at your Claude subscription.</h1>
+        <p class="lead rise">
+          LocalRouter is an OpenAI-compatible proxy that drives the real <span class="mono">claude</span> CLI —
+          so Continue, litellm, LangChain, or your own client run on your Claude Max/Pro plan.
+          No API key. No code changes.
+        </p>
+        <div class="hero-cmd rise">
+          <div class="cmd">
+            <code><span class="prompt">$ </span>brew install localrouter</code>
+            <button class="copy" data-copy="brew install localrouter" aria-label="Copy install command">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="hero-actions rise">
+          <a class="btn btn-ghost" href="https://github.com/ravencloak-org/LocalRouter">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.85 9.73.5.1.68-.22.68-.49 0-.24-.01-.87-.01-1.71-2.79.62-3.38-1.22-3.38-1.22-.46-1.18-1.11-1.5-1.11-1.5-.91-.64.07-.62.07-.62 1 .07 1.53 1.06 1.53 1.06.9 1.56 2.35 1.11 2.92.85.09-.66.35-1.11.63-1.36-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.72 0 0 .84-.27 2.75 1.05a9.4 9.4 0 0 1 5 0c1.91-1.32 2.75-1.05 2.75-1.05.55 1.42.2 2.46.1 2.72.64.72 1.03 1.63 1.03 2.75 0 3.94-2.35 4.81-4.58 5.06.36.32.68.94.68 1.9 0 1.37-.01 2.48-.01 2.82 0 .27.18.6.69.49A10.02 10.02 0 0 0 22 12.25C22 6.58 17.52 2 12 2z"/></svg>
+            View on GitHub
+          </a>
+        </div>
+        <p class="hero-note rise">
+          Runs locally, single-user. It uses your Claude Code usage quota and is ToS-adjacent —
+          <a href="#how">here's why that's the allowed path</a>.
+        </p>
+      </div>
+    </header>
+
+    <!-- how it works -->
+    <section id="how">
+      <div class="wrap">
+        <div class="head">
+          <h2>It drives the real CLI. It never touches your token.</h2>
+          <p>
+            Anthropic bans extracting subscription OAuth tokens for third-party clients. Spawning the
+            genuine <span class="mono">claude</span> CLI — which authenticates itself — is allowed.
+            LocalRouter takes the second path, and strips Claude Code's agent context from every call.
+          </p>
+        </div>
+        <div class="mech">
+          <div class="mech-card before rise">
+            <div class="mech-label">Raw agent call</div>
+            <div class="mech-num mono">~161K<span class="mech-sub"> </span></div>
+            <div class="mech-sub">tokens per request · about $0.92</div>
+          </div>
+          <div class="mech-arrow" aria-hidden="true">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+          </div>
+          <div class="mech-card after rise">
+            <div class="mech-label">Context-isolated</div>
+            <div class="mech-num mono">~183</div>
+            <div class="mech-sub">tokens per request · about $0.0006</div>
+          </div>
+        </div>
+        <p class="mech-foot rise">
+          Same answer, <strong>OAuth intact</strong>, ~880× fewer tokens. LocalRouter never reads
+          <span class="mono">~/.claude</span>; the CLI does the auth, LocalRouter just speaks OpenAI on top.
+        </p>
+      </div>
+    </section>
+
+    <!-- live stats -->
+    <section id="stats" class="stats">
+      <div class="wrap">
+        <div class="head">
+          <h2>Measured, not marketed.</h2>
+          <p>Every number below is real, aggregated from opt-out anonymous telemetry. When there's nothing yet, it says so.</p>
+        </div>
+        <div class="stat-row">
+          <div class="stat rise">
+            {stats.installs == null
+              ? <div class="n pending mono">collecting</div>
+              : <div class="n mono" data-count={stats.installs}>{compact(stats.installs)}</div>}
+            <div class="l">Installs reporting in</div>
+          </div>
+          <div class="stat rise">
+            {stats.tokensServed == null
+              ? <div class="n pending mono">collecting</div>
+              : <div class="n mono" data-count={stats.tokensServed}>{compact(stats.tokensServed)}</div>}
+            <div class="l">Tokens served</div>
+          </div>
+          <div class="stat rise">
+            {stats.usdSaved == null
+              ? <div class="n pending mono">collecting</div>
+              : <div class="n mono" data-count={stats.usdSaved} data-usd="1">{usd(stats.usdSaved)}</div>}
+            <div class="l">API dollars saved</div>
+          </div>
+        </div>
+        <p class="stats-foot"><span class="dot"></span> Model and token counts only — never prompts or content. Opt out with <span class="mono">DO_NOT_TRACK=1</span>.</p>
+      </div>
+    </section>
+
+    <!-- works with your tools -->
+    <section id="features">
+      <div class="wrap">
+        <div class="head"><h2>Speaks OpenAI. Runs where you work.</h2></div>
+        <div class="rows">
+          <div class="row rise">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 6-6-6-6"/><path d="M12 19h8"/></svg>
+            <div>
+              <h3>Drop-in OpenAI endpoint</h3>
+              <p>Point any OpenAI-compatible client at <span class="mono">http://localhost:8083/v1</span> with any key value. Streaming and non-streaming both work.</p>
+            </div>
+          </div>
+          <div class="row rise">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 12 20 8"/><path d="M12 12v9"/></svg>
+            <div>
+              <h3>Model &amp; effort, per request</h3>
+              <p>Switch between <span class="mono">sonnet</span>, <span class="mono">opus</span>, and <span class="mono">haiku</span> live from the menu bar — no restart, applied on the next call.</p>
+            </div>
+          </div>
+          <div class="row rise">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 7.5 8 9 4.5-1.5 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>
+            <div>
+              <h3>Local and private</h3>
+              <p>Binds <span class="mono">127.0.0.1</span> only. Nothing leaves your machine except anonymous, opt-out counts — no prompts, no responses, no IPs.</p>
+            </div>
+          </div>
+          <div class="row rise">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M7 6.5h.01"/></svg>
+            <div>
+              <h3>Live dashboard</h3>
+              <p>Watch requests, the queue, cost, and login state as they happen. Menu-bar app on macOS, tray on Windows and Linux — both self-update.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- install -->
+    <section id="install">
+      <div class="wrap">
+        <div class="head"><h2>Install in one line.</h2><p>Needs the <span class="mono">claude</span> CLI installed and logged in — LocalRouter drives it, it doesn't bundle it.</p></div>
+        <div class="install">
+          <div class="tabs" role="tablist" aria-label="Install method">
+            <button class="tab" role="tab" id="tab-brew" aria-selected="true" aria-controls="panel-brew">Homebrew</button>
+            <button class="tab" role="tab" id="tab-nix" aria-selected="false" aria-controls="panel-nix">Nix</button>
+          </div>
+          <div class="tabpanel" id="panel-brew" role="tabpanel" aria-labelledby="tab-brew" data-active="true">
+            <div class="block">
+              <div class="block-head"><span>macOS · Linux</span>
+                <button class="copy" data-copy={"brew tap ravencloak-org/localrouter\nbrew trust ravencloak-org/localrouter\nbrew install localrouter"} aria-label="Copy Homebrew commands">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+                </button>
+              </div>
+              <pre><code><span class="prompt">$ </span>brew tap ravencloak-org/localrouter
+<span class="prompt">$ </span>brew trust ravencloak-org/localrouter  <span class="cm"># one-time</span>
+<span class="prompt">$ </span>brew install localrouter          <span class="cm"># headless core</span>
+<span class="prompt">$ </span>brew install --cask localrouter   <span class="cm"># menu-bar app</span></code></pre>
+            </div>
+          </div>
+          <div class="tabpanel" id="panel-nix" role="tabpanel" aria-labelledby="tab-nix" data-active="false">
+            <div class="block">
+              <div class="block-head"><span>Linux · macOS</span>
+                <button class="copy" data-copy={"nix run github:ravencloak-org/LocalRouter"} aria-label="Copy Nix command">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+                </button>
+              </div>
+              <pre><code><span class="prompt">$ </span>nix run github:ravencloak-org/LocalRouter          <span class="cm"># run</span>
+<span class="prompt">$ </span>nix profile add github:ravencloak-org/LocalRouter  <span class="cm"># install</span></code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- honest disclosure -->
+    <section id="disclosure">
+      <div class="wrap disclosure">
+        <div class="aside rise">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+          <div>
+            <h3>The honest version</h3>
+            <p>
+              This is ToS-adjacent, and it is <strong>not</strong> flat-rate: it spends your Claude Code
+              usage quota, and a real Anthropic API key is the boring-safe path. It's built for local,
+              single-user use.
+            </p>
+            <p>
+              What makes it defensible is the one thing it refuses to do — it never extracts your OAuth
+              token. It drives the genuine CLI and speaks OpenAI on top. See
+              <a href="https://github.com/ravencloak-org/LocalRouter/blob/main/docs/adr/0002-claude-cli-not-oauth-token.md" style="text-decoration:underline;text-underline-offset:3px;">ADR-0002</a>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- footer -->
+    <footer>
+      <div class="wrap">
+        <a class="brand" href="/"><img src="/moose.png" alt="" width="22" height="22" style="width:22px;height:22px" /> LocalRouter</a>
+        <span class="foot-spacer"></span>
+        <a href="https://github.com/ravencloak-org/LocalRouter">GitHub</a>
+        <span class="mono">v0.1.6</span>
+      </div>
+    </footer>
+
+    <script>
+      // copy affordance
+      document.querySelectorAll<HTMLButtonElement>(".copy").forEach((b) => {
+        b.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(b.dataset.copy || "");
+            b.dataset.copied = "true";
+            setTimeout(() => (b.dataset.copied = "false"), 1400);
+          } catch {}
+        });
+      });
+
+      // install tabs
+      const tabs = document.querySelectorAll<HTMLButtonElement>(".tab");
+      tabs.forEach((t) => t.addEventListener("click", () => {
+        tabs.forEach((o) => o.setAttribute("aria-selected", String(o === t)));
+        document.querySelectorAll<HTMLElement>(".tabpanel").forEach((p) => {
+          p.dataset.active = String(p.id === t.getAttribute("aria-controls"));
+        });
+      }));
+
+      // one authored moment: rise-in + count-up on scroll
+      const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const io = new IntersectionObserver((entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          e.target.classList.add("in");
+          const num = e.target.querySelector<HTMLElement>("[data-count]");
+          if (num && !reduce) countUp(num);
+          io.unobserve(e.target);
+        }
+      }, { threshold: 0.3 });
+      document.querySelectorAll(".rise").forEach((el) => io.observe(el));
+
+      function countUp(el: HTMLElement) {
+        const target = Number(el.dataset.count || 0);
+        const usdMode = el.dataset.usd === "1";
+        const usdFmt = (n: number) => n < 1 ? "$" + n.toFixed(4) : n < 100 ? "$" + n.toFixed(2) : "$" + Math.round(n).toLocaleString("en-US");
+        const fmt = (n: number) => usdMode ? usdFmt(n) : short(n);
+        const start = performance.now(), dur = 1100;
+        const tick = (now: number) => {
+          const p = Math.min(1, (now - start) / dur);
+          const eased = 1 - Math.pow(1 - p, 4);
+          el.textContent = fmt(target * eased);
+          if (p < 1) requestAnimationFrame(tick);
+          else el.textContent = fmt(target);
+        };
+        requestAnimationFrame(tick);
+      }
+      function short(n: number) {
+        if (n < 1000) return String(Math.round(n));
+        const u = ["k", "M", "B"]; let i = -1, v = n;
+        while (v >= 1000 && i < u.length - 1) { v /= 1000; i++; }
+        return (v >= 100 ? Math.round(v) : v.toFixed(1)) + u[i];
+      }
+    </script>
+  </body>
+</html>
