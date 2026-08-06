@@ -9,7 +9,12 @@
 // a single POST. Region host is derived from the App-Key prefix like the client SDKs.
 import { platform, release } from "node:os";
 
-const KEY = process.env.LR_APTABASE_APP_KEY;
+// Project's own Aptabase app key, baked in so telemetry is ON BY DEFAULT for every install
+// (opt-out model, Homebrew-style). Replace "" with the real A-US-/A-EU-/A-SH- key from
+// aptabase.com. Users override with LR_APTABASE_APP_KEY (e.g. to self-host their own stats).
+const DEFAULT_APP_KEY = "";
+
+const KEY = process.env.LR_APTABASE_APP_KEY || DEFAULT_APP_KEY;
 
 // host from the App-Key region: A-US-… / A-EU-… / A-SH-… (self-host needs LR_APTABASE_HOST)
 function resolveHost(): string | undefined {

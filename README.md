@@ -104,12 +104,15 @@ LLM (LocalRouter) from embeddings.
 
 ## Telemetry
 
-**Off by default.** Nothing is sent unless you set `LR_APTABASE_APP_KEY`. When enabled it emits
-one anonymous [Aptabase](https://aptabase.com) event per completed request containing **only**:
-`model`, `tokens_in`, `tokens_out`, and `usd_saved` (the API-equivalent cost your subscription
-covered). It never sends prompts, responses, client tokens, or IPs. Kill it any time with
-`DO_NOT_TRACK=1` or `LR_TELEMETRY=0`. These aggregate numbers (installs, tokens served, $ saved)
-power the public stats page.
+**Anonymous, on by default, one command to turn off.** LocalRouter emits one anonymous
+[Aptabase](https://aptabase.com) event per completed request containing **only**: `model`,
+`tokens_in`, `tokens_out`, and `usd_saved` (the API-equivalent cost your subscription covered).
+It never sends prompts, responses, client tokens, or IPs, and Aptabase stores no IP.
+
+Opt out any time: set `DO_NOT_TRACK=1` (the cross-tool standard) or `LR_TELEMETRY=0`. Point it at
+your own Aptabase instance with `LR_APTABASE_APP_KEY` (+ `LR_APTABASE_HOST` for self-host).
+
+These aggregate numbers (tokens served, $ saved) power the public stats page.
 
 ## Status: scaffold
 
