@@ -47,8 +47,11 @@ brew install --cask localrouter   # macOS menu-bar app
 
 **Nix** (Linux/server + mac CLI):
 ```bash
-nix run github:ravencloak-org/LocalRouter              # run the core
-nix profile install github:ravencloak-org/LocalRouter  # install it
+# one-time: enable flakes if you haven't (else "experimental Nix feature 'nix-command' is disabled")
+mkdir -p ~/.config/nix && echo 'experimental-features = nix-command flakes' >> ~/.config/nix/nix.conf
+
+nix run github:ravencloak-org/LocalRouter          # run the core
+nix profile add github:ravencloak-org/LocalRouter  # install it (older Nix: `nix profile install`)
 ```
 
 All install paths need the `claude` CLI installed and logged in (`claude login`) — it's a
