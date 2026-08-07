@@ -14,3 +14,7 @@ memory/
 *.app/
 .fallow/
 tray-go/localrouter-tray
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json
