@@ -201,7 +201,7 @@ footer a:hover { color: var(--coral); }
 @media (max-width: 760px) {
   .wrap { padding-inline: 1.15rem; }
   .hero h1 { font-size: clamp(2rem, 8.5vw, 3.2rem); }
-  .hero-brand img { width: clamp(56px, 15vw, 84px); }
+  .hero-brand img.moose { width: clamp(56px, 15vw, 84px); }
   .hero-brand .wordmark { font-size: clamp(1.5rem, 6.5vw, 2.2rem); }
   .mech { grid-template-columns: 1fr; }
   .mech-arrow { transform: rotate(90deg); padding: 0.25rem 0; }
