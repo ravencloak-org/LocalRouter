@@ -1,0 +1,12 @@
+.git
+**/node_modules
+dist
+web/dist
+tray
+tray-go
+site
+packaging
+assets
+docs
+*.md
+.github

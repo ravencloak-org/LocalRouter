@@ -392,9 +392,14 @@ const port = getConfig().port;
 // localhost-only (ADR-0003) but dual-stack: bind IPv4 127.0.0.1 AND IPv6 ::1 so clients that
 // resolve `localhost` to ::1 (macOS default) can still reach us. Fixes "unreachable" for
 // litellm/httpx clients like Cognee.
-Bun.serve({ port, hostname: "127.0.0.1", fetch: app.fetch });
-try {
-  Bun.serve({ port, hostname: "::1", fetch: app.fetch });
-} catch { /* IPv6 unavailable — IPv4 still serves */ }
-console.log(`[LocalRouter] core on localhost:${port} (127.0.0.1 + ::1)`);
+// LR_HOST overrides the bind for containerized runs (Docker needs 0.0.0.0 to be port-mappable);
+// leave it unset for host installs so we stay localhost-only.
+const host = process.env.LR_HOST ?? "127.0.0.1";
+Bun.serve({ port, hostname: host, fetch: app.fetch });
+if (host === "127.0.0.1") {
+  try {
+    Bun.serve({ port, hostname: "::1", fetch: app.fetch });
+  } catch { /* IPv6 unavailable — IPv4 still serves */ }
+}
+console.log(`[LocalRouter] core on ${host}:${port}${host === "127.0.0.1" ? " (127.0.0.1 + ::1)" : ""}`);
 noticeOnce(); // one-time anonymous-telemetry opt-out notice (no-op when telemetry is off)

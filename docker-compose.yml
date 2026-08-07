@@ -1,0 +1,30 @@
+# LocalRouter via docker-compose.
+#
+#   1. On a machine already logged into Claude, mint a headless token:
+#          claude setup-token
+#   2. Put it in a .env next to this file:
+#          CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...
+#   3. docker compose up -d
+#
+# Then point any OpenAI client at http://<host>:8083/v1 . The dashboard is at http://<host>:8083 .
+#
+# Exposing this beyond localhost? Set LR_REQUIRE_TOKEN=1 and create a client token
+# in the dashboard; callers send it as their OpenAI API key.
+services:
+  localrouter:
+    image: ghcr.io/ravencloak-org/localrouter:latest
+    # Or build from source instead of pulling:
+    # build: { context: ., args: { LR_VERSION: dev } }
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN}
+      LR_REQUIRE_TOKEN: ${LR_REQUIRE_TOKEN:-0}
+      LR_MODEL: ${LR_MODEL:-sonnet}
+      LR_CONCURRENCY: ${LR_CONCURRENCY:-8}
+    volumes:
+      - lr-data:/data
+
+volumes:
+  lr-data:
