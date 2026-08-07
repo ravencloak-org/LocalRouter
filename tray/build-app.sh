@@ -11,8 +11,9 @@ APP="LocalRouter.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/LocalRouterTray "$APP/Contents/MacOS/LocalRouter"
-# SwiftPM resource bundle (tray icon) — Bundle.module resolves next to the executable
-cp -R .build/release/*.bundle "$APP/Contents/MacOS/" 2>/dev/null || true
+# Tray icon into Contents/Resources so the .app codesigns as one sealed bundle
+# (the SwiftPM *.bundle resolves to the app root, which can't be sealed -> "damaged").
+cp Sources/LocalRouterTray/Resources/tray.png "$APP/Contents/Resources/tray.png"
 # app icon (Finder) from the logo
 sips -s format icns ../assets/logo.png --out "$APP/Contents/Resources/icon.icns" >/dev/null 2>&1 || true
 
@@ -41,5 +42,10 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
+
+# Ad-hoc codesign the whole bundle. Everything now lives under Contents/, so the seal is
+# valid and macOS no longer flags the app as "damaged" (the cask postflight strips quarantine).
+codesign --force --deep --sign - "$APP"
+codesign --verify --verbose "$APP"
 
 echo "built $APP"

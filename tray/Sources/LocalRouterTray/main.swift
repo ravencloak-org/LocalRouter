@@ -100,7 +100,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func loadTrayIcon() -> NSImage? {
-        guard let url = Bundle.module.url(forResource: "tray", withExtension: "png"),
+        // In the packaged .app the icon lives in Contents/Resources (Bundle.main) so the
+        // whole bundle can be codesigned; Bundle.module (an app-root .bundle) can't be sealed
+        // and made every release read as "damaged". Bundle.module stays as the `swift run` fallback.
+        guard let url = Bundle.main.url(forResource: "tray", withExtension: "png")
+                ?? Bundle.module.url(forResource: "tray", withExtension: "png"),
               let img = NSImage(contentsOf: url) else { return nil }
         img.size = NSSize(width: 18, height: 18) // menu-bar height
         img.isTemplate = false // colored logo, not a monochrome mask

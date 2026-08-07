@@ -14,6 +14,13 @@ cask "localrouter" do
 
   app "LocalRouter.app"
 
+  # The app is ad-hoc signed, not notarized. Strip the download quarantine so Gatekeeper
+  # lets it launch directly instead of blocking it as an "unidentified developer".
+  postflight do
+    system_command "/usr/bin/xattr",
+                   args: ["-dr", "com.apple.quarantine", "#{appdir}/LocalRouter.app"]
+  end
+
   caveats <<~EOS
     LocalRouter requires the Claude CLI to be installed and logged in:
       https://docs.anthropic.com/en/docs/claude-code
