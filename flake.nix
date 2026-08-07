@@ -12,15 +12,15 @@
       # `sha256` values below with the real checksums of the matching
       # `localrouter-<os>-<arch>` asset for the tag (same flow as the Homebrew
       # formula in packaging/homebrew/Formula/localrouter.rb).
-      version = "0.1.9";
+      version = "0.1.10";
 
       # nixpkgs system -> release asset name + sha256 placeholder.
       # sha256s are filled in by release automation (nix-prefetch-url on each asset).
       assets = {
-        "x86_64-linux"   = { name = "localrouter-linux-x64";    sha256 = "sha256-ES2rnTG2HxjjtXEqtEi2aqN2kW6j0/tOkZQqkGNH94E="; };
-        "aarch64-linux"  = { name = "localrouter-linux-arm64";  sha256 = "sha256-0CCOBtuO5TK61ggekF4CO2QJszvErcUVN9UzQcfjKvo="; };
-        "aarch64-darwin" = { name = "localrouter-darwin-arm64"; sha256 = "sha256-DOZ4My5cnXrF4maN2XRm4PCdc3zPJkZBhRsATTywCjw="; };
-        "x86_64-darwin"  = { name = "localrouter-darwin-x64";   sha256 = "sha256-AXbnvTxGWy3BQ2m4r5kFM7lg+qOXUx5P91wc61K33ic="; };
+        "x86_64-linux"   = { name = "localrouter-linux-x64";    sha256 = "sha256-OUte7YFMtUSAlHsUZ1cLv97tZTAljj67v9FBqeybqjM="; };
+        "aarch64-linux"  = { name = "localrouter-linux-arm64";  sha256 = "sha256-dMpY946tIpu/nkojOgQpsCfcgDIs8WsRc4tiiiBD4Ls="; };
+        "aarch64-darwin" = { name = "localrouter-darwin-arm64"; sha256 = "sha256-at8/FM+gUsjUQpwjapITHJ+bea/Fe1PlWhCWRjj48zg="; };
+        "x86_64-darwin"  = { name = "localrouter-darwin-x64";   sha256 = "sha256-RKuetDc5yotFXSTyIrBg+Bg/KKzAIuG6DtTzQL+DsAk="; };
       };
     in
     flake-utils.lib.eachDefaultSystem (system:
