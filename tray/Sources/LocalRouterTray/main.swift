@@ -46,21 +46,38 @@ enum Control {
     static func shutdown() { request("/control/shutdown", method: "POST") { _ in } }
 
     static func login() {
-        // Interactive OAuth needs a TTY -> run in Terminal.app (ADR-0003).
-        osascript("""
-        tell application "Terminal"
-            activate
-            do script "claude setup-token"
-        end tell
-        """)
-    }
-}
+        // `claude auth login` opens the browser itself and returns a code the user pastes back.
+        // Run it under a pty (via `script`) so NO Terminal window appears, then collect the code
+        // with a native dialog and write it to the CLI's stdin. (ADR-0002: OAuth via the CLI.)
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/script")
+        // -q quiet, /dev/null discards the typescript; `-l` login shell loads PATH (bun/claude).
+        p.arguments = ["-q", "/dev/null", "/bin/zsh", "-lc", "claude auth login --claudeai"]
+        let stdin = Pipe()
+        p.standardInput = stdin
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        do { try p.run() } catch { return }
 
-func osascript(_ src: String) {
-    let p = Process()
-    p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-    p.arguments = ["-e", src]
-    try? p.run()
+        // Browser is already open; ask for the code with a small dialog (no terminal in sight).
+        DispatchQueue.main.async {
+            let a = NSAlert()
+            a.messageText = "Sign in to Claude"
+            a.informativeText = "A browser window opened for sign-in. After you approve, paste the code shown in the browser here."
+            a.addButton(withTitle: "Sign in")
+            a.addButton(withTitle: "Cancel")
+            let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
+            field.placeholderString = "Paste code"
+            a.accessoryView = field
+            NSApp.activate(ignoringOtherApps: true)
+            if a.runModal() == .alertFirstButtonReturn {
+                let code = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let d = (code + "\n").data(using: .utf8) { stdin.fileHandleForWriting.write(d) }
+            } else {
+                p.terminate()
+            }
+        }
+    }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
