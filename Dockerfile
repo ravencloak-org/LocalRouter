@@ -20,6 +20,7 @@ RUN cd core && bun build server.ts --compile \
 FROM node:22-slim AS runtime
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates git \
+ && npm i -g npm@latest \
  && npm i -g @anthropic-ai/claude-code \
  && apt-get purge -y --auto-remove \
  && rm -rf /var/lib/apt/lists/*
