@@ -388,6 +388,46 @@ if (process.argv.includes("--version")) {
   process.exit(0); // brew/nix test hook, and CLI convention
 }
 
+// `localrouter token <create|list|rm>` — mint/manage /v1 client tokens from the CLI so a
+// headless or containerized deploy can issue tokens without the dashboard. Writes to the same
+// SQLite the running server reads (LR_CONFIG_DIR), so a new token is honored immediately.
+if (process.argv[2] === "token") {
+  const sub = process.argv[3];
+  const rest = process.argv.slice(4);
+  const has = (f: string) => rest.includes(f);
+  const val = (f: string) => { const i = rest.indexOf(f); return i >= 0 ? rest[i + 1] : undefined; };
+  if (sub === "create" || sub === "new") {
+    const name = val("--name") ?? rest.find((a) => !a.startsWith("-"));
+    if (!name) { console.error("usage: localrouter token create --name <name> [--quiet|--export]"); process.exit(2); }
+    const { token } = createToken(name); // idempotent by name
+    if (has("--export")) {
+      // eval "$(localrouter token create --name x --export)" sets LR_TOKEN in the current shell
+      console.log(`export LR_TOKEN=${token}`);
+    } else if (has("--quiet")) {
+      console.log(token); // token only, for LR_TOKEN=$(... --quiet)
+    } else {
+      console.log(token);
+      console.error(`\nToken '${name}' created. Send it as the OpenAI API key: Authorization: Bearer ${token}`);
+      console.error(`Enforce it by starting the server with LR_REQUIRE_TOKEN=1.`);
+      console.error(`Tip: eval "$(localrouter token create --name ${name} --export)"  # sets $LR_TOKEN`);
+    }
+    process.exit(0);
+  }
+  if (sub === "list" || sub === "ls") {
+    for (const r of _tokList.all() as Array<{ token: string; name: string; created: number }>)
+      console.log(`${r.token}\t${r.name}\t${new Date(r.created).toISOString()}`);
+    process.exit(0);
+  }
+  if (sub === "rm" || sub === "delete") {
+    if (!rest[0]) { console.error("usage: localrouter token rm <token>"); process.exit(2); }
+    _tokDel.run(rest[0]);
+    console.error(`removed ${rest[0]}`);
+    process.exit(0);
+  }
+  console.error("usage: localrouter token <create --name NAME [--quiet|--export] | list | rm TOKEN>");
+  process.exit(2);
+}
+
 const port = getConfig().port;
 // localhost-only (ADR-0003) but dual-stack: bind IPv4 127.0.0.1 AND IPv6 ::1 so clients that
 // resolve `localhost` to ::1 (macOS default) can still reach us. Fixes "unreachable" for
