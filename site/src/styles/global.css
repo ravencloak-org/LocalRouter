@@ -173,7 +173,7 @@ footer a { color: var(--muted); }
 footer a:hover { color: var(--coral); }
 .foot-spacer { flex: 1; }
 .by-raven { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; color: #fff; }
-.by-raven img { height: 18px; width: auto; opacity: 0.92; }
+.by-raven img { height: 18px; width: auto; flex-shrink: 0; object-fit: contain; opacity: 0.92; }
 .by-raven:hover { color: var(--coral); }
 .by-raven:hover img { opacity: 1; }
 /* hero brand: moose | (LocalRouter over "by Raven [mark]") — by-raven sits BELOW the wordmark, right-aligned to its end */
