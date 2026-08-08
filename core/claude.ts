@@ -12,6 +12,11 @@ const TIMEOUT_MS = Number(process.env.LR_TIMEOUT_MS ?? 300_000);
 // full coding-agent session. Measured 161K -> ~181 tokens/call, $0.92 -> $0.0006, OAuth intact.
 // (--bare is NOT used: it forces ANTHROPIC_API_KEY and disables OAuth, breaking ADR-0002.)
 const ISOLATED = process.env.LR_ISOLATED !== "0"; // default on
+
+// The CLI command to spawn (default "claude"). Whitespace-split so it can carry a wrapper +
+// fixed flags — e.g. LR_CLAUDE_BIN="/opt/bin/claude", "npx @anthropic-ai/claude-code", or a
+// gateway wrapper script. Pair with ANTHROPIC_BASE_URL (config/dashboard) to redirect upstream.
+const CLAUDE_BIN = (process.env.LR_CLAUDE_BIN ?? "claude").split(/\s+/).filter(Boolean);
 const ISO_DIR = mkdtempSync(join(tmpdir(), "localrouter-")); // empty cwd: no CLAUDE.md discovery
 const EMPTY_MCP = join(ISO_DIR, "empty-mcp.json");
 writeFileSync(EMPTY_MCP, '{"mcpServers":{}}');
@@ -79,7 +84,7 @@ export async function* runClaude(
     args.push("--append-system-prompt", system);
   }
   // prompt via stdin: no shell, no arg-length limit, no injection
-  const proc = Bun.spawn(["claude", ...args], {
+  const proc = Bun.spawn([...CLAUDE_BIN, ...args], {
     stdin: Buffer.from(prompt),
     stdout: "pipe",
     stderr: "pipe",
@@ -166,7 +171,7 @@ export async function* runClaude(
 // tokens, so we treat the first request-time 503/auth error as the auth signal instead.
 export async function cliAlive(): Promise<boolean> {
   try {
-    const proc = Bun.spawn(["claude", "--version"], { stdout: "ignore", stderr: "ignore" });
+    const proc = Bun.spawn([...CLAUDE_BIN, "--version"], { stdout: "ignore", stderr: "ignore" });
     return (await proc.exited) === 0;
   } catch {
     return false; // `claude` not on PATH (e.g. under launchd) -> clean 503, not a 500
