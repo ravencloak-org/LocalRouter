@@ -59,12 +59,12 @@ export function App() {
     const run = document.getElementById("lr-run");
     if (run) {
       run.textContent = s ? "● running · :" + s.port : "○ core not reachable";
-      run.style.color = s ? "#34d399" : "#737373";
+      run.style.color = s ? "#34d399" : "#7a625b";
     }
     const lg = document.getElementById("lr-login");
     if (lg) {
       lg.textContent = s ? (s.loggedIn ? "logged in" : "logged out") : "—";
-      lg.style.color = s ? (s.loggedIn ? "#34d399" : "#f87171") : "#737373";
+      lg.style.color = s ? (s.loggedIn ? "#34d399" : "#f87171") : "#7a625b";
     }
     if (s) {
       setVal("lr-model", s.model);
@@ -140,7 +140,7 @@ export function App() {
   const selectRow = async (id: string) => {
     const r = rowMap.get(id);
     document.querySelectorAll("[data-row]").forEach((el) => {
-      (el as HTMLElement).style.background = (el as HTMLElement).dataset.row === id ? "rgba(56,189,248,0.08)" : "";
+      (el as HTMLElement).style.background = (el as HTMLElement).dataset.row === id ? "rgba(255,87,71,0.12)" : "";
     });
     const head = document.getElementById("d-head");
     const meta = document.getElementById("d-meta");
@@ -205,10 +205,10 @@ export function App() {
     loadTokens();
   };
 
-  return <div class="min-h-screen bg-neutral-950 text-neutral-300 antialiased">
+  return <div class="min-h-screen overflow-x-hidden bg-neutral-950 text-neutral-300 antialiased">
     <div class="mx-auto max-w-6xl p-6 space-y-6">
 
-      <header class="flex items-center gap-3">
+      <header class="flex flex-wrap items-center gap-3">
         <img src="/favicon.png" class="h-9 w-9" alt="" />
         <div>
           <h1 class="text-lg font-semibold text-neutral-100 leading-none">{"LocalRouter"}</h1>
@@ -243,7 +243,7 @@ export function App() {
         <div class="flex flex-wrap items-end gap-4">
           <label class="flex flex-col gap-1">
             <span class="text-xs text-neutral-500">{"Model"}</span>
-            <select id="lr-model" onChange={onModel} class="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 outline-none focus:border-neutral-500">
+            <select id="lr-model" onChange={onModel} class="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/40">
               <option value="sonnet">{"sonnet"}</option>
               <option value="opus">{"opus"}</option>
               <option value="haiku">{"haiku"}</option>
@@ -251,7 +251,7 @@ export function App() {
           </label>
           <label class="flex flex-col gap-1">
             <span class="text-xs text-neutral-500">{"Effort"}</span>
-            <select id="lr-effort" onChange={onEffort} class="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 outline-none focus:border-neutral-500">
+            <select id="lr-effort" onChange={onEffort} class="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/40">
               <option value="">{"default"}</option>
               <option value="low">{"low"}</option>
               <option value="medium">{"medium"}</option>
@@ -260,13 +260,13 @@ export function App() {
           </label>
           <label class="flex flex-col gap-1">
             <span class="text-xs text-neutral-500">{"Port"}<span class="text-neutral-600">{" (restart)"}</span></span>
-            <input id="lr-port" type="number" min="1" max="65535" onChange={onPort} class="w-24 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 outline-none focus:border-neutral-500" />
+            <input id="lr-port" type="number" min="1" max="65535" onChange={onPort} class="w-24 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/40" />
           </label>
-          <label class="flex flex-1 flex-col gap-1">
+          <label class="flex min-w-0 flex-1 basis-full flex-col gap-1 sm:basis-auto">
             <span class="text-xs text-neutral-500">{"Anthropic base URL"}</span>
-            <input id="lr-baseurl" type="text" placeholder="default" onChange={onBaseUrl} class="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 outline-none focus:border-neutral-500" />
+            <input id="lr-baseurl" type="text" placeholder="default" onChange={onBaseUrl} class="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/40" />
           </label>
-          <button onClick={() => login()} class="rounded-lg bg-neutral-100 px-4 py-1.5 text-sm font-medium text-neutral-900 transition hover:bg-white">{"Login"}</button>
+          <button onClick={() => login()} class="rounded-lg bg-brand-500 px-4 py-1.5 text-sm font-medium text-neutral-950 transition hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/50">{"Login"}</button>
         </div>
         <p class="mt-3 text-xs text-neutral-600">{"Start / Stop the core from the menu-bar tray. Port applies on restart; env vars win over these fields."}</p>
       </div>
@@ -274,13 +274,14 @@ export function App() {
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div class="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
           <div class="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-500">{"Usage"}</div>
-          <div class="grid grid-cols-3 gap-3">
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
             <div><div class="text-xs text-neutral-500">{"last hour"}</div><div id="u-1h" class="mt-1 text-xs tabular-nums text-neutral-200">{"…"}</div></div>
             <div><div class="text-xs text-neutral-500">{"last 24h"}</div><div id="u-24h" class="mt-1 text-xs tabular-nums text-neutral-200">{"…"}</div></div>
             <div><div class="text-xs text-neutral-500">{"last 7d"}</div><div id="u-7d" class="mt-1 text-xs tabular-nums text-neutral-200">{"…"}</div></div>
           </div>
           <div class="mt-4 mb-1 text-xs uppercase tracking-wide text-neutral-500">{"By client (7d)"}</div>
-          <table class="w-full text-sm">
+          <div class="overflow-x-auto">
+          <table class="w-full min-w-[18rem] text-sm">
             <tbody>
               @for (const c of clients) {
                 <tr class="border-b border-neutral-800/50">
@@ -292,26 +293,29 @@ export function App() {
               }
             </tbody>
           </table>
+          </div>
         </div>
 
         <div class="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
           <div class="mb-3 text-xs font-medium uppercase tracking-wide text-neutral-500">{"Client tokens"}</div>
           <div class="flex flex-wrap items-center gap-2">
-            <input id="tok-name" type="text" placeholder="client name (e.g. cognee)" class="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 outline-none focus:border-neutral-500" />
-            <button onClick={() => onCreateToken()} class="rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-900 hover:bg-white">{"Create token"}</button>
+            <input id="tok-name" type="text" placeholder="client name (e.g. cognee)" class="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-sm text-neutral-200 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500/40" />
+            <button onClick={() => onCreateToken()} class="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-neutral-950 hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/50">{"Create token"}</button>
           </div>
           <div id="tok-new" class="mt-2 break-all font-mono text-xs text-emerald-400"></div>
-          <table class="mt-3 w-full text-sm">
+          <div class="mt-3 overflow-x-auto">
+          <table class="w-full min-w-[18rem] text-sm">
             <tbody>
               @for (const t of tokens) {
                 <tr class="border-b border-neutral-800/50">
                   <td class="py-1 pr-4 text-neutral-200">{t.name}</td>
-                  <td class="py-1 pr-4 font-mono text-xs text-neutral-500">{t.token}</td>
+                  <td class="py-1 pr-4 font-mono text-xs text-neutral-500 break-all">{t.token}</td>
                   <td class="py-1 text-right"><button onClick={() => onRevoke(t.token)} class="text-red-400 hover:text-red-300">{"revoke"}</button></td>
                 </tr>
               }
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
@@ -323,7 +327,7 @@ export function App() {
               <button data-row={r.id} onClick={() => selectRow(r.id)} class="flex w-full items-center gap-2 border-b border-neutral-800/50 px-3 py-2 text-left transition hover:bg-neutral-800/40">
                 <span class={"h-2 w-2 shrink-0 rounded-full " + phaseColor(r.phase, r.httpStatus)}></span>
                 <span class="w-24 shrink-0 truncate font-mono text-xs text-neutral-400">{r.id}</span>
-                <span class="w-16 shrink-0 truncate text-xs text-sky-300">{r.client}</span>
+                <span class="w-16 shrink-0 truncate text-xs text-neutral-400">{r.client}</span>
                 <span class="flex-1 truncate text-xs text-neutral-400">{rowLine(r)}</span>
               </button>
             }
